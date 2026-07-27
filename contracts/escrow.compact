@@ -1,0 +1,28 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+export ledger status: Opaque<"string">;
+export ledger escrowHash: Bytes<32>;
+export ledger buyer: Bytes<32>;
+export ledger seller: Bytes<32>;
+export ledger amount: Uint<64>;
+
+export witness escrowSecret(): Bytes<32>;
+
+export circuit createEscrow(buyerKey: Bytes<32>, sellerKey: Bytes<32>, depositAmount: Uint<64>): [] {
+  const secret = escrowSecret();
+  escrowHash = disclose(secret);
+  buyer = disclose(buyerKey);
+  seller = disclose(sellerKey);
+  amount = disclose(depositAmount);
+  status = disclose("funded");
+}
+
+export circuit releaseEscrow(): [] {
+  status = disclose("released");
+}
+
+export circuit cancelEscrow(): [] {
+  status = disclose("cancelled");
+}

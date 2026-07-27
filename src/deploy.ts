@@ -4,28 +4,16 @@
  * Non-interactive: scaffold → npm run setup runs straight through.
  * No readline prompts, no .midnight-seed file.
  */
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import * as Rx from 'rxjs';
+import { WebSocket } from 'ws';
+
 import { resolveNetwork, getOrCreateSeed, recordDeployment } from './network';
 import { createWallet, persistWalletState, unshieldedToken, type WalletContext } from './wallet';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { WebSocket } from 'ws';
-import * as Rx from 'rxjs';
-
-// Midnight SDK imports
+import { createEscrowProviders, loadEscrowContract, PRIVATE_STATE_ID } from './contract';
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
-import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
-import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-js';
 
 // @ts-expect-error Required for wallet sync
 globalThis.WebSocket = WebSocket;
-
-// Identifier under which this contract's private state is stored. The
-// hello-world contract has no witnesses, so its private state is empty ({}).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
 
 // ─── Network configuration ─────────────────────────────────────────────────────
 //
@@ -65,63 +53,21 @@ async function waitForProofServer(maxAttempts = 60, delayMs = 2000): Promise<boo
 
 // ─── Compiled contract loading ─────────────────────────────────────────────────
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
-const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
+let cachedCompiledContract: any;
+let cachedZkConfigPath: string;
 
-if (!fs.existsSync(contractPath)) {
-  console.error('\n❌ Contract not compiled! Run: npm run compile\n');
-  process.exit(1);
+async function prepareContract() {
+  if (!cachedCompiledContract) {
+    const { compiledContract, zkConfigPath } = await loadEscrowContract();
+    cachedCompiledContract = compiledContract;
+    cachedZkConfigPath = zkConfigPath;
+  }
+  return { compiledContract: cachedCompiledContract, zkConfigPath: cachedZkConfigPath };
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
-
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
-  CompiledContract.withCompiledFileAssets(zkConfigPath),
-);
-
-// ─── Providers ─────────────────────────────────────────────────────────────────
-
 async function createProviders(walletCtx: WalletContext) {
-  // The SDK requires the private-state password to be at least 16 characters.
-  // The default below is a placeholder for local devnet only — set a strong
-  // password via PRIVATE_STATE_PASSWORD when you move to a non-local target.
-  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Local-Devnet-Development-Placeholder-1';
-
-  const walletProvider = {
-    // In Midnight.js 4.1.x the WalletProvider interface returns the key objects
-    // (CoinPublicKey / EncPublicKey) directly — no longer hex strings.
-    getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
-    getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
-    async balanceTx(tx: any, ttl?: Date) {
-      // balanceUnboundTransaction -> finalizeRecipe is the complete balancing
-      // path in wallet-sdk 1.x; the earlier explicit signRecipe step is gone.
-      const recipe = await walletCtx.wallet.balanceUnboundTransaction(
-        tx,
-        { shieldedSecretKeys: walletCtx.shieldedSecretKeys, dustSecretKey: walletCtx.dustSecretKey },
-        { ttl: ttl ?? new Date(Date.now() + 30 * 60 * 1000) },
-      );
-      return walletCtx.wallet.finalizeRecipe(recipe);
-    },
-    submitTx: (tx: any) => walletCtx.wallet.submitTransaction(tx) as any,
-  };
-
-  const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
-  const accountId = walletCtx.unshieldedKeystore.getBech32Address().toString();
-
-  return {
-    privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
-      accountId,
-      privateStoragePasswordProvider: () => privateStatePassword,
-    }),
-    publicDataProvider: indexerPublicDataProvider(networkConfig.indexer, networkConfig.indexerWS),
-    zkConfigProvider,
-    proofProvider: httpClientProofProvider(networkConfig.proofServer, zkConfigProvider),
-    walletProvider,
-    midnightProvider: walletProvider,
-  };
+  const { zkConfigPath } = await prepareContract();
+  return createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
@@ -223,8 +169,7 @@ async function main() {
     console.log(`  Registering ${unregisteredUtxos.length} NIGHT UTXOs for DUST generation...`);
     // The signDustRegistration callback (3rd arg) already produces a recipe
     // with N signatures matching N inputs. Do NOT call signRecipe again — that
-    // would double-sign and the chain rejects with InputsSignaturesLengthMismatch
-    // (Custom error 192). Matches upstream example-counter and example-bboard.
+    // would double-sign and the chain rejects with InputsSignaturesLengthMismatch.
     const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
       unregisteredUtxos,
       walletCtx.unshieldedKeystore.getPublicKey(),
@@ -284,14 +229,16 @@ async function main() {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       // Midnight.js 4.1.x supplies private state via privateStateId +
-      // initialPrivateState (empty here — the hello-world contract has no
-      // witnesses). args is the contract constructor's arguments: empty for
-      // hello-world's no-arg constructor. (Statically-typed contracts can omit
-      // args entirely; this script loads the contract dynamically, so the
-      // conditional args type widens to any[] and an explicit [] is required.)
+      // initialPrivateState. The escrow contract expects constructor arguments
+      // for the buyer/seller keys and initial deposit amount.
+      const { compiledContract } = await prepareContract();
       deployed = await deployContract(providers, {
         compiledContract: compiledContract as any,
-        args: [],
+        args: [
+          Uint8Array.from(Buffer.from('escrow-buyer', 'utf8')),
+          Uint8Array.from(Buffer.from('escrow-seller', 'utf8')),
+          0n,
+        ],
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
       });

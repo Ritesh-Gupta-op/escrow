@@ -4,25 +4,15 @@
  * Reconnects to the deployed contract, reads its ledger state, and exits 0
  * on success. Used by `npm run test:e2e` and by the project's CI workflows.
  */
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
 
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
-import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 import { resolveNetwork, getOrCreateSeed, getDeployment } from '../src/network';
 import { createWallet, persistWalletState } from '../src/wallet';
-import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-js';
+import { createEscrowProviders, loadEscrowContract, PRIVATE_STATE_ID } from '../src/contract';
 
 // @ts-expect-error wallet sync requires WebSocket
 globalThis.WebSocket = WebSocket;
-
-// Must match the privateStateId used at deploy time (witness-free → empty state).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
 
 // ─── Network configuration ─────────────────────────────────────────────────────
 
@@ -50,15 +40,7 @@ async function main() {
   }
 
   // 2. Build wallet and providers
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
-  const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
-  if (!fs.existsSync(contractPath)) fail('Compiled contract missing — run `npm run compile`.');
-  const HelloWorld = await import(pathToFileURL(contractPath).href);
-  const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-    CompiledContract.withVacantWitnesses,
-    CompiledContract.withCompiledFileAssets(zkConfigPath),
-  );
+  const { compiledContract, zkConfigPath } = await loadEscrowContract();
 
   const walletCtx = await createWallet({ network, networkConfig, seed: SEED });
   await walletCtx.wallet.waitForSyncedState();
@@ -66,33 +48,7 @@ async function main() {
   // when run against the same persistent wallet directory.
   await persistWalletState(network, walletCtx);
 
-  const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
-  const walletProvider = {
-    // Midnight.js 4.1.x returns the key objects (CoinPublicKey / EncPublicKey).
-    getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
-    getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
-    async balanceTx() {
-      throw new Error('e2e-check is read-only and should not balance transactions');
-    },
-    submitTx() {
-      throw new Error('e2e-check is read-only and should not submit transactions');
-    },
-  } as any;
-
-  const providers = {
-    privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
-      accountId: walletCtx.unshieldedKeystore.getBech32Address().toString(),
-      // SDK requires ≥16 chars. e2e-check is read-only so we don't expose
-      // the env-var override here — match the deploy script's local-devnet default.
-      privateStoragePasswordProvider: () => 'Local-Devnet-Development-Placeholder-1',
-    }),
-    publicDataProvider: indexerPublicDataProvider(networkConfig.indexer, networkConfig.indexerWS),
-    zkConfigProvider,
-    proofProvider: httpClientProofProvider(networkConfig.proofServer, zkConfigProvider),
-    walletProvider,
-    midnightProvider: walletProvider,
-  };
+  const providers = await createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
 
   // 3. Reconnect to the deployed contract — proves callTx interface is wired
   try {

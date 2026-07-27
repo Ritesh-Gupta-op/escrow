@@ -6,7 +6,8 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "compile": "compact compile contracts/escrow.compact contracts/managed/escrow",
+    "compact": "tsx scripts/compile-contract.ts",
+    "compile": "npm run compact",
     "build": "npx tsc --noEmit",
     "start": "npx tsx src/server.ts",
     "setup": "npx tsx src/setup.ts",

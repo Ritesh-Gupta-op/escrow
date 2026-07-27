@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createHash, randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
@@ -27,6 +28,13 @@ function sendJson(res: ServerResponse, payload: unknown, statusCode = 200): void
   res.end(JSON.stringify(payload));
 }
 
+function secretBytes(value: unknown): Uint8Array {
+  if (typeof value !== 'string' || value.trim().length < 12) {
+    throw new Error('Buyer and seller authorization secrets must each be at least 12 characters.');
+  }
+  return new Uint8Array(createHash('sha256').update(value, 'utf8').digest());
+}
+
 const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -50,10 +58,10 @@ const html = `<!doctype html>
         <h1>Escrow dashboard</h1>
         <p>Create and manage a confidential escrow agreement with an on-chain status marker.</p>
         <form id="escrow-form">
-          <label>Buyer</label>
-          <input name="buyer" placeholder="buyer@example.com" required />
-          <label>Seller</label>
-          <input name="seller" placeholder="seller@example.com" required />
+          <label>Buyer authorization secret</label>
+          <input name="buyer" type="password" autocomplete="off" required />
+          <label>Seller authorization secret</label>
+          <input name="seller" type="password" autocomplete="off" required />
           <label>Amount</label>
           <input name="amount" type="number" min="1" step="1" value="100" required />
           <button type="submit">Create escrow</button>
@@ -119,32 +127,32 @@ const server = createServer(async (req, res) => {
       const walletCtx = await createWallet({ network, networkConfig, seed });
       await walletCtx.wallet.waitForSyncedState();
       await persistWalletState(network, walletCtx);
-      const providers = await createEscrowProviders(walletCtx, network, networkConfig, require('node:path').resolve(process.cwd(), 'contracts', 'managed', 'escrow'));
+      const { compiledContract, zkConfigPath } = await loadEscrowContract();
+      const providers = await createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
       const deployment = getDeployment(network);
       const contractAddress = deployment?.address ?? configuredAddress;
 
-      await loadEscrowContract();
       const deployed: any = await findDeployedContract(providers as any, {
-        compiledContract: (await loadEscrowContract()).compiledContract as any,
+        compiledContract: compiledContract as any,
         contractAddress,
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
       });
 
       const amount = Number(payload.amount ?? 0);
-      const buyerBytes = new Uint8Array(32);
-      const sellerBytes = new Uint8Array(32);
-      buyerBytes.set(Buffer.from(String(payload.buyer ?? 'buyer')));
-      sellerBytes.set(Buffer.from(String(payload.seller ?? 'seller')));
-      const tx = await deployed.callTx.createEscrow(buyerBytes, sellerBytes, BigInt(amount));
+      if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Amount must be a positive whole number.');
+      const tx = await deployed.callTx.createEscrow(
+        secretBytes(payload.buyer),
+        secretBytes(payload.seller),
+        new Uint8Array(randomBytes(32)),
+      );
 
       sendJson(res, {
         status: 'created',
         txId: tx.public.txId,
         contractAddress,
         amount,
-        buyer: payload.buyer,
-        seller: payload.seller,
+        message: 'Escrow created. Store the authorization secrets securely; they are required to prove release or refund authorization.',
       });
     } catch (error) {
       sendJson(res, { error: error instanceof Error ? error.message : String(error) }, 500);

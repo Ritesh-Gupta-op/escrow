@@ -34,7 +34,7 @@ services:
     # indexer whose config hard-requires a Blockfrost API key at boot — the
     # process exits 1 without APP__INFRA__SPO_NODE__BLOCKFROST_ID (verified
     # against 4.3.3 on 2026-07-15). A dummy value satisfies the config loader
-    # on a local devnet (upstream example-hello-world ships the same dummy),
+    # on a local devnet (the upstream starter ships the same dummy),
     # so no real Blockfrost credential is needed for zero-config local dev.
     # Do NOT bump to 4.3.4/4.4.0: those tags are pre-alpha integration builds
     # for the future ledger-9/node-2 line, not stable releases.

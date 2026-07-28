@@ -14,7 +14,8 @@ A privacy-preserving escrow DApp for Midnight that proves buyer or seller author
 - Release funds only when the seller proves knowledge of the seller secret.
 - Refund only when the buyer proves knowledge of the buyer secret.
 - Keep agreement terms, amount, commitment randomness, and authorization secrets private.
-- Provide a local dashboard/API, interactive CLI, local wallet, network configuration, and proof-server integration.
+- Provide a browser dashboard, local HTTP API, interactive CLI, local wallet, network configuration, and proof-server integration.
+- Show live escrow status, public commitment hashes, and on-chain lifecycle transitions.
 - Validate lifecycle transitions and surface deployment/loading errors clearly.
 
 ## What This Project Does
@@ -44,6 +45,8 @@ The contract is a privacy-first escrow state machine. An escrow is created once,
 contracts/
   escrow.compact          Compact escrow contract
   managed/escrow/         Generated contract assets (gitignored)
+public/
+  index.html              Browser dashboard for escrow creation, release, and refund
 src/
   server.ts               Dashboard and HTTP API
   cli.ts                  Interactive escrow CLI

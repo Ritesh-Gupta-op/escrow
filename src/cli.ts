@@ -9,8 +9,8 @@ import { WebSocket } from 'ws';
 
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { resolveNetwork, getOrCreateSeed, getDeployment } from './network';
-import { createWallet, persistWalletState, unshieldedToken } from './wallet';
-import { createEscrowProviders, loadEscrowContract, PRIVATE_STATE_ID } from './contract';
+import { createWallet, persistWalletState, unshieldedToken, type WalletContext } from './wallet';
+import { createEscrowProviders, loadEscrowContract, PRIVATE_STATE_ID, type EscrowPrivateState } from './contract';
 
 // Enable WebSocket for GraphQL subscriptions
 // @ts-expect-error Required for wallet sync
@@ -19,8 +19,24 @@ globalThis.WebSocket = WebSocket;
 const { network, config: networkConfig } = resolveNetwork();
 const SEED = getOrCreateSeed(network);
 
-function secretBytes(value: string): Uint8Array {
-  return new Uint8Array(createHash('sha256').update(value, 'utf8').digest());
+function secretBytes(value: string): Buffer {
+  return Buffer.from(createHash('sha256').update(value, 'utf8').digest());
+}
+
+const STATUS_NAMES = ['UNFUNDED', 'FUNDED', 'RELEASED', 'REFUNDED'] as const;
+
+function statusName(status: number): string {
+  return STATUS_NAMES[status] ?? `UNKNOWN(${status})`;
+}
+
+async function setEscrowPrivateState(
+  provider: any,
+  contractAddress: string,
+  nextState: Partial<EscrowPrivateState>,
+): Promise<void> {
+  provider.setContractAddress(contractAddress);
+  const current = (await provider.get(PRIVATE_STATE_ID)) as Partial<EscrowPrivateState> | null;
+  await provider.set(PRIVATE_STATE_ID, { ...current, ...nextState } as EscrowPrivateState);
 }
 
 async function main() {
@@ -43,6 +59,7 @@ async function main() {
 
     const { compiledContract, zkConfigPath, escrowModule } = await loadEscrowContract();
     const providers = await createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
+    providers.privateStateProvider.setContractAddress(deployment.address as any);
 
     const deployed: any = await findDeployedContract(providers as any, {
       compiledContract: compiledContract as any,
@@ -65,15 +82,26 @@ async function main() {
 
       switch (choice.trim()) {
         case '1': {
-          const buyer = await rl.question('  Buyer identifier: ');
-          const seller = await rl.question('  Seller identifier: ');
+          const buyer = await rl.question('  Buyer authorization secret: ');
+          const seller = await rl.question('  Seller authorization secret: ');
           const amount = await rl.question('  Amount: ');
+          const terms = await rl.question('  Agreement terms (private): ');
+
+          if (!buyer || buyer.trim().length < 12) throw new Error('Buyer secret must be at least 12 characters.');
+          if (!seller || seller.trim().length < 12) throw new Error('Seller secret must be at least 12 characters.');
           if (!amount || Number(amount) <= 0) throw new Error('Amount must be greater than zero.');
+
           const tx = await deployed.callTx.createEscrow(
             secretBytes(buyer),
             secretBytes(seller),
-            new Uint8Array(randomBytes(32)),
+            new Uint8Array(createHash('sha256').update(`${Number(amount)}:${terms ?? ''}:${randomBytes(32).toString('hex')}`, 'utf8').digest()),
           );
+
+          await setEscrowPrivateState(providers.privateStateProvider, deployment.address, {
+            buyerAuthorizationSecret: secretBytes(buyer),
+            sellerAuthorizationSecret: secretBytes(seller),
+          });
+
           console.log(`\n  ✅ Escrow created: ${tx.public.txId}\n`);
           break;
         }
@@ -81,17 +109,32 @@ async function main() {
           const state = await providers.publicDataProvider.queryContractState(deployment.address);
           if (state) {
             const ledgerState = escrowModule.ledger(state.data);
-            console.log(`\n  Escrow status code: ${ledgerState.status}`);
-            console.log('  Agreement details remain private.');
+            console.log(`\n  Escrow status: ${statusName(Number(ledgerState.status))} (${ledgerState.status})`);
+            console.log(`  Buyer authority: ${Buffer.from(ledgerState.buyerAuthority).toString('hex')}`);
+            console.log(`  Seller authority: ${Buffer.from(ledgerState.sellerAuthority).toString('hex')}`);
+            console.log(`  Agreement commitment: ${Buffer.from(ledgerState.agreementCommitment).toString('hex')}`);
+            console.log('  Agreement terms and authorization secrets remain private.');
+          } else {
+            console.log('\n  No escrow state found for this contract.');
           }
           break;
         }
         case '3': {
+          const seller = await rl.question('  Seller authorization secret: ');
+          if (!seller || seller.trim().length < 12) throw new Error('Seller secret must be at least 12 characters.');
+          await setEscrowPrivateState(providers.privateStateProvider, deployment.address, {
+            sellerAuthorizationSecret: secretBytes(seller),
+          });
           const tx = await deployed.callTx.releaseEscrow();
           console.log(`\n  ✅ Escrow released: ${tx.public.txId}\n`);
           break;
         }
         case '4': {
+          const buyer = await rl.question('  Buyer authorization secret: ');
+          if (!buyer || buyer.trim().length < 12) throw new Error('Buyer secret must be at least 12 characters.');
+          await setEscrowPrivateState(providers.privateStateProvider, deployment.address, {
+            buyerAuthorizationSecret: secretBytes(buyer),
+          });
           const tx = await deployed.callTx.refundEscrow();
           console.log(`\n  ✅ Escrow refunded: ${tx.public.txId}\n`);
           break;

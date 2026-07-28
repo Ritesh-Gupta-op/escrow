@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Escrow DApp</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #07111f;
+        color: #f8fbff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.15), transparent 35%),
+          radial-gradient(circle at bottom right, rgba(147, 51, 234, 0.12), transparent 30%);
+      }
+      .page {
+        width: min(100%, 980px);
+        padding: 1.5rem;
+      }
+      .hero {
+        margin-bottom: 1rem;
+      }
+      .hero h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+      }
+      .hero p {
+        margin: 0;
+        max-width: 44rem;
+        line-height: 1.7;
+        color: #c6d3e8;
+      }
+      .grid {
+        display: grid;
+        gap: 1.5rem;
+      }
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .card {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 1.25rem;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 1.5rem;
+      }
+      .card h2 {
+        margin-top: 0;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-weight: 700;
+      }
+      input,
+      textarea,
+      button {
+        width: 100%;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.05);
+        color: #f8fbff;
+        font: inherit;
+        padding: 0.95rem 1rem;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      button {
+        margin-top: 1.25rem;
+        background: linear-gradient(135deg, #2563eb, #9333ea);
+        border: none;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .status {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .status-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .status-line span:first-child {
+        color: #98a8c6;
+      }
+      .panel {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 1rem;
+        padding: 1rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      .notice {
+        margin: 0;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: rgba(91, 33, 182, 0.16);
+        color: #d8dcff;
+      }
+      .controls {
+        display: grid;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <h1>Escrow DApp</h1>
+        <p>Interact with the private escrow contract. Create an escrow with confidential terms, then release or refund it using authorization secrets without revealing them on-chain.</p>
+      </section>
+
+      <div class="grid grid-2">
+        <section class="card">
+          <h2>Escrow status</h2>
+          <div class="status">
+            <div class="status-line"><span>Contract</span><strong id="contract-address">Loading…</strong></div>
+            <div class="status-line"><span>Status</span><strong id="escrow-status">Loading…</strong></div>
+            <div class="status-line"><span>Agreement commitment</span><strong id="agreement-commitment">Loading…</strong></div>
+            <div class="status-line"><span>Buyer authority</span><strong id="buyer-authority">Loading…</strong></div>
+            <div class="status-line"><span>Seller authority</span><strong id="seller-authority">Loading…</strong></div>
+          </div>
+          <div class="panel" id="contract-note">Loading the contract details…</div>
+        </section>
+
+        <section class="card">
+          <h2>Latest response</h2>
+          <div class="panel" id="response">Refreshing status…</div>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Create escrow</h2>
+          <form id="create-form">
+            <label>Buyer authorization secret</label>
+            <input name="buyer" type="password" autocomplete="new-password" required minlength="12" />
+            <label>Seller authorization secret</label>
+            <input name="seller" type="password" autocomplete="new-password" required minlength="12" />
+            <label>Amount</label>
+            <input name="amount" type="number" min="1" step="1" value="100" required />
+            <label>Agreement terms</label>
+            <textarea name="terms" placeholder="Describe the agreement terms in private"></textarea>
+            <button type="submit">Create escrow</button>
+          </form>
+        </section>
+
+        <section class="card controls">
+          <div>
+            <h2>Release escrow</h2>
+            <form id="release-form">
+              <label>Seller authorization secret</label>
+              <input name="seller" type="password" autocomplete="current-password" minlength="12" required />
+              <button type="submit">Release</button>
+            </form>
+          </div>
+
+          <div>
+            <h2>Refund escrow</h2>
+            <form id="refund-form">
+              <label>Buyer authorization secret</label>
+              <input name="buyer" type="password" autocomplete="current-password" minlength="12" required />
+              <button type="submit">Refund</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const contractAddressEl = document.getElementById('contract-address');
+      const escrowStatusEl = document.getElementById('escrow-status');
+      const agreementEl = document.getElementById('agreement-commitment');
+      const buyerAuthorityEl = document.getElementById('buyer-authority');
+      const sellerAuthorityEl = document.getElementById('seller-authority');
+      const responseEl = document.getElementById('response');
+      const contractNoteEl = document.getElementById('contract-note');
+      const createForm = document.getElementById('create-form');
+      const releaseForm = document.getElementById('release-form');
+      const refundForm = document.getElementById('refund-form');
+
+      async function fetchJson(path, options) {
+        const response = await fetch(path, options);
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error || JSON.stringify(body));
+        }
+        return body;
+      }
+
+      function formatBytes(value) {
+        if (!value) return '—';
+        return value.slice(0, 8) + '…' + value.slice(-8);
+      }
+
+      async function refreshStatus() {
+        responseEl.textContent = 'Refreshing contract state…';
+        try {
+          const payload = await fetchJson('/api/escrow');
+          contractAddressEl.textContent = payload.contractAddress || '<YOUR_DEPLOYED_CONTRACT_ADDRESS>';
+          escrowStatusEl.textContent = payload.statusName || payload.status || 'unknown';
+          agreementEl.textContent = formatBytes(payload.agreementCommitment);
+          buyerAuthorityEl.textContent = formatBytes(payload.buyerAuthority);
+          sellerAuthorityEl.textContent = formatBytes(payload.sellerAuthority);
+          contractNoteEl.textContent = payload.message || 'The dashboard is ready. Use the forms below to create, release, or refund the escrow.';
+          responseEl.textContent = 'Escrow status refreshed successfully.';
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          contractAddressEl.textContent = 'Unavailable';
+          escrowStatusEl.textContent = 'Unavailable';
+          agreementEl.textContent = 'Unavailable';
+          buyerAuthorityEl.textContent = 'Unavailable';
+          sellerAuthorityEl.textContent = 'Unavailable';
+          contractNoteEl.textContent = 'Set CONTRACT_ADDRESS to your deployed contract address and restart the server after deployment.';
+          responseEl.textContent = message;
+        }
+      }
+
+      createForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(createForm);
+        const payload = {
+          buyer: formData.get('buyer'),
+          seller: formData.get('seller'),
+          amount: formData.get('amount'),
+          terms: formData.get('terms'),
+        };
+        responseEl.textContent = 'Creating escrow…';
+        try {
+          const result = await fetchJson('/api/escrows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          responseEl.textContent = JSON.stringify(result, null, 2);
+          await refreshStatus();
+        } catch (error) {
+          responseEl.textContent = error instanceof Error ? error.message : String(error);
+        }
+      });
+
+      releaseForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(releaseForm);
+        const payload = { seller: formData.get('seller') };
+        responseEl.textContent = 'Releasing escrow…';
+        try {
+          const result = await fetchJson('/api/escrows/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          responseEl.textContent = JSON.stringify(result, null, 2);
+          await refreshStatus();
+        } catch (error) {
+          responseEl.textContent = error instanceof Error ? error.message : String(error);
+        }
+      });
+
+      refundForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(refundForm);
+        const payload = { buyer: formData.get('buyer') };
+        responseEl.textContent = 'Refunding escrow…';
+        try {
+          const result = await fetchJson('/api/escrows/refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          responseEl.textContent = JSON.stringify(result, null, 2);
+          await refreshStatus();
+        } catch (error) {
+          responseEl.textContent = error instanceof Error ? error.message : String(error);
+        }
+      });
+
+      window.addEventListener('load', refreshStatus);
+    </script>
+  </body>
+</html>

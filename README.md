@@ -11,6 +11,12 @@ A privacy-preserving escrow DApp for Midnight that proves buyer or seller author
 ## Live Link : [vercel](https://escrow-henna-seven.vercel.app/)
 ## Demo Video : [demo](https://drive.google.com/file/d/1JKyK9ODofAk_H_-WWBU35iC4dmaD63x5/view?usp=sharing)
 
+## UI screenshots:
+<img width="1902" height="856" alt="Screenshot 2026-07-28 150750" src="https://github.com/user-attachments/assets/7f8c3f80-16bd-46fd-860d-8f122bda071a" />
+<img width="1864" height="834" alt="Screenshot 2026-07-29 134909" src="https://github.com/user-attachments/assets/94ab9aff-b35f-4b05-a0a8-c841b9b2a096" />
+
+
+
 ## Features
 
 - Create a single escrow agreement with buyer and seller authorization commitments.

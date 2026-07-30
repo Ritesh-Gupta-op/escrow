@@ -218,7 +218,7 @@
       function setPending(isPending) {
         isActionPending = isPending;
         const buttons = [walletActionButton, createForm.querySelector('button'), releaseForm.querySelector('button'), refundForm.querySelector('button')];
-        buttons.forEach((button) => { button.disabled = isPending; });
+        buttons.forEach((button) => { if (button) button.disabled = isPending; });
       }
 
       function findBrowserWallet() {

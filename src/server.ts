@@ -189,9 +189,11 @@ const server = createServer(async (req, res) => {
 
       const buyerSecret = String(payload.buyer ?? '').trim();
       const sellerSecret = String(payload.seller ?? '').trim();
+      const walletAddress = String(payload.walletAddress ?? '').trim();
       const amount = Number(payload.amount ?? 0);
       const terms = String(payload.terms ?? '');
 
+      if (!walletAddress) throw new Error('A connected browser wallet address is required to create escrow.');
       if (!buyerSecret || buyerSecret.length < 12) throw new Error('Buyer secret must be at least 12 characters.');
       if (!sellerSecret || sellerSecret.length < 12) throw new Error('Seller secret must be at least 12 characters.');
       if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Amount must be a positive whole number.');
@@ -218,6 +220,7 @@ const server = createServer(async (req, res) => {
 
       sendJson(res, {
         status: 'created',
+        walletAddress,
         txId: tx.public.txId,
         contractAddress,
         amount,
@@ -235,6 +238,8 @@ const server = createServer(async (req, res) => {
     try {
       const payload = JSON.parse(body);
       const sellerSecret = String(payload.seller ?? '').trim();
+      const walletAddress = String(payload.walletAddress ?? '').trim();
+      if (!walletAddress) throw new Error('A connected browser wallet address is required to release escrow.');
       if (!sellerSecret || sellerSecret.length < 12) throw new Error('Seller secret must be at least 12 characters.');
 
       const configuredAddress = getContractAddress();
@@ -261,6 +266,7 @@ const server = createServer(async (req, res) => {
       const tx = await deployed.callTx.releaseEscrow();
       sendJson(res, {
         status: 'released',
+        walletAddress,
         txId: tx.public.txId,
         contractAddress,
         message: 'Escrow released. The seller secret was accepted without being disclosed on-chain.',
@@ -277,6 +283,8 @@ const server = createServer(async (req, res) => {
     try {
       const payload = JSON.parse(body);
       const buyerSecret = String(payload.buyer ?? '').trim();
+      const walletAddress = String(payload.walletAddress ?? '').trim();
+      if (!walletAddress) throw new Error('A connected browser wallet address is required to refund escrow.');
       if (!buyerSecret || buyerSecret.length < 12) throw new Error('Buyer secret must be at least 12 characters.');
 
       const configuredAddress = getContractAddress();
@@ -303,6 +311,7 @@ const server = createServer(async (req, res) => {
       const tx = await deployed.callTx.refundEscrow();
       sendJson(res, {
         status: 'refunded',
+        walletAddress,
         txId: tx.public.txId,
         contractAddress,
         message: 'Escrow refunded. The buyer secret was accepted without being disclosed on-chain.',

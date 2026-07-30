@@ -148,6 +148,16 @@
         </section>
       </div>
 
+      <section class="card">
+        <h2>Wallet connection</h2>
+        <div class="status">
+          <div class="status-line"><span>Wallet status</span><strong id="wallet-status">Not connected</strong></div>
+          <div class="status-line"><span>Connected address</span><strong id="wallet-address">None</strong></div>
+        </div>
+        <button type="button" id="wallet-action">Connect Wallet</button>
+        <p class="notice">Use a browser wallet such as Lace or Midnight to connect and authorize actions from your own account.</p>
+      </section>
+
       <div class="grid">
         <section class="card">
           <h2>Create escrow</h2>
@@ -194,9 +204,123 @@
       const sellerAuthorityEl = document.getElementById('seller-authority');
       const responseEl = document.getElementById('response');
       const contractNoteEl = document.getElementById('contract-note');
+      const walletStatusEl = document.getElementById('wallet-status');
+      const walletAddressEl = document.getElementById('wallet-address');
+      const walletActionButton = document.getElementById('wallet-action');
       const createForm = document.getElementById('create-form');
       const releaseForm = document.getElementById('release-form');
       const refundForm = document.getElementById('refund-form');
+
+      let connectedWalletAddress = null;
+      let walletProvider = null;
+      let isActionPending = false;
+
+      function setPending(isPending) {
+        isActionPending = isPending;
+        const buttons = [walletActionButton, createForm.querySelector('button'), releaseForm.querySelector('button'), refundForm.querySelector('button')];
+        buttons.forEach((button) => { button.disabled = isPending; });
+      }
+
+      function findBrowserWallet() {
+        if (window.lace) return window.lace;
+        if (window.midnight) return window.midnight;
+        return null;
+      }
+
+      async function getWalletAddress(provider, { allowPrompt = false } = {}) {
+        if (!provider) return null;
+
+        if (provider.getAccounts) {
+          const accounts = await provider.getAccounts();
+          if (Array.isArray(accounts) && accounts.length > 0) {
+            return accounts[0]?.address || accounts[0]?.bech32 || accounts[0]?.bech32Address || accounts[0];
+          }
+        }
+
+        if (provider.getConnectedAddresses) {
+          const addresses = await provider.getConnectedAddresses();
+          if (Array.isArray(addresses) && addresses.length > 0) return addresses[0];
+        }
+
+        if (provider.connect && allowPrompt) {
+          const connected = await provider.connect();
+          if (Array.isArray(connected) && connected.length > 0) {
+            return connected[0]?.address || connected[0]?.bech32 || connected[0]?.bech32Address || connected[0];
+          }
+          if (connected?.address) return connected.address;
+          if (connected?.bech32) return connected.bech32;
+          if (connected?.bech32Address) return connected.bech32Address;
+        }
+
+        return null;
+      }
+
+      async function updateWalletState() {
+        walletProvider = findBrowserWallet();
+
+        if (!walletProvider) {
+          walletStatusEl.textContent = 'No wallet detected';
+          walletAddressEl.textContent = 'None';
+          walletActionButton.textContent = 'Install Wallet';
+          walletActionButton.disabled = false;
+          return;
+        }
+
+        if (!connectedWalletAddress) {
+          const address = await getWalletAddress(walletProvider, { allowPrompt: false });
+          connectedWalletAddress = address;
+        }
+
+        walletStatusEl.textContent = connectedWalletAddress ? 'Connected' : 'Disconnected';
+        walletAddressEl.textContent = connectedWalletAddress || 'None';
+        walletActionButton.textContent = connectedWalletAddress ? 'Disconnect Wallet' : 'Connect Wallet';
+        walletActionButton.disabled = false;
+      }
+
+      async function connectWallet() {
+        if (!walletProvider) throw new Error('No Midnight-compatible browser wallet is installed. Install Lace or Midnight wallet and refresh the page.');
+        const address = await getWalletAddress(walletProvider, { allowPrompt: true });
+        if (!address) throw new Error('Wallet connection was unsuccessful or no account was returned.');
+        connectedWalletAddress = address;
+      }
+
+      async function disconnectWallet() {
+        if (walletProvider && walletProvider.disconnect) {
+          await walletProvider.disconnect();
+        }
+        connectedWalletAddress = null;
+      }
+
+      walletActionButton.addEventListener('click', async () => {
+        responseEl.textContent = '';
+        setPending(true);
+        try {
+          if (!walletProvider) {
+            throw new Error('No browser wallet detected. Install Lace or Midnight wallet and refresh the page.');
+          }
+
+          if (connectedWalletAddress) {
+            await disconnectWallet();
+            responseEl.textContent = 'Wallet disconnected.';
+          } else {
+            await connectWallet();
+            responseEl.textContent = 'Wallet connected successfully.';
+          }
+
+          await updateWalletState();
+        } catch (error) {
+          responseEl.textContent = error instanceof Error ? error.message : String(error);
+        } finally {
+          setPending(false);
+        }
+      });
+
+      function requireConnectedWallet() {
+        if (!connectedWalletAddress) {
+          throw new Error('Connect your browser wallet before submitting an escrow transaction.');
+        }
+        return connectedWalletAddress;
+      }
 
       async function fetchJson(path, options) {
         const response = await fetch(path, options);
@@ -237,14 +361,17 @@
 
       createForm.addEventListener('submit', async (event) => {
         event.preventDefault();
+        const walletAddress = requireConnectedWallet();
         const formData = new FormData(createForm);
         const payload = {
           buyer: formData.get('buyer'),
           seller: formData.get('seller'),
           amount: formData.get('amount'),
           terms: formData.get('terms'),
+          walletAddress,
         };
         responseEl.textContent = 'Creating escrow…';
+        setPending(true);
         try {
           const result = await fetchJson('/api/escrows', {
             method: 'POST',
@@ -255,14 +382,18 @@
           await refreshStatus();
         } catch (error) {
           responseEl.textContent = error instanceof Error ? error.message : String(error);
+        } finally {
+          setPending(false);
         }
       });
 
       releaseForm.addEventListener('submit', async (event) => {
         event.preventDefault();
+        const walletAddress = requireConnectedWallet();
         const formData = new FormData(releaseForm);
-        const payload = { seller: formData.get('seller') };
+        const payload = { seller: formData.get('seller'), walletAddress };
         responseEl.textContent = 'Releasing escrow…';
+        setPending(true);
         try {
           const result = await fetchJson('/api/escrows/release', {
             method: 'POST',
@@ -273,14 +404,18 @@
           await refreshStatus();
         } catch (error) {
           responseEl.textContent = error instanceof Error ? error.message : String(error);
+        } finally {
+          setPending(false);
         }
       });
 
       refundForm.addEventListener('submit', async (event) => {
         event.preventDefault();
+        const walletAddress = requireConnectedWallet();
         const formData = new FormData(refundForm);
-        const payload = { buyer: formData.get('buyer') };
+        const payload = { buyer: formData.get('buyer'), walletAddress };
         responseEl.textContent = 'Refunding escrow…';
+        setPending(true);
         try {
           const result = await fetchJson('/api/escrows/refund', {
             method: 'POST',
@@ -291,10 +426,15 @@
           await refreshStatus();
         } catch (error) {
           responseEl.textContent = error instanceof Error ? error.message : String(error);
+        } finally {
+          setPending(false);
         }
       });
 
-      window.addEventListener('load', refreshStatus);
+      window.addEventListener('load', async () => {
+        await updateWalletState();
+        await refreshStatus();
+      });
     </script>
   </body>
 </html>

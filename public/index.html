@@ -47,6 +47,11 @@
       .grid-2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      @media (max-width: 768px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
       .card {
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 1.25rem;
@@ -62,6 +67,7 @@
         font-weight: 700;
       }
       input,
+      select,
       textarea,
       button {
         width: 100%;
@@ -71,6 +77,10 @@
         color: #f8fbff;
         font: inherit;
         padding: 0.95rem 1rem;
+      }
+      select option {
+        background: #0f172a;
+        color: #f8fbff;
       }
       textarea {
         min-height: 120px;
@@ -83,6 +93,10 @@
         color: white;
         font-weight: 700;
         cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      button:hover:not(:disabled) {
+        opacity: 0.9;
       }
       button:disabled {
         opacity: 0.5;
@@ -116,6 +130,21 @@
         background: rgba(91, 33, 182, 0.16);
         color: #d8dcff;
       }
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: rgba(37, 99, 235, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(96, 165, 250, 0.3);
+      }
+      .badge.connected {
+        background: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+        border-color: rgba(74, 222, 128, 0.3);
+      }
       .controls {
         display: grid;
         gap: 1rem;
@@ -139,7 +168,7 @@
             <div class="status-line"><span>Buyer authority</span><strong id="buyer-authority">Loading…</strong></div>
             <div class="status-line"><span>Seller authority</span><strong id="seller-authority">Loading…</strong></div>
           </div>
-          <div class="panel" id="contract-note">Loading the contract details…</div>
+          <div style="margin-top: 1rem;" class="panel" id="contract-note">Loading the contract details…</div>
         </section>
 
         <section class="card">
@@ -148,17 +177,29 @@
         </section>
       </div>
 
-      <section class="card">
-        <h2>Wallet connection</h2>
+      <section style="margin-top: 1.5rem;" class="card">
+        <h2>Frontend Wallet Connection (@midnight-ntwrk/dapp-connector-api)</h2>
         <div class="status">
-          <div class="status-line"><span>Wallet status</span><strong id="wallet-status">Not connected</strong></div>
-          <div class="status-line"><span>Connected address</span><strong id="wallet-address">None</strong></div>
+          <div class="status-line"><span>Target Network</span>
+            <select id="network-select" style="width: auto; padding: 0.4rem 0.8rem; margin: 0;">
+              <option value="preprod" selected>Preprod</option>
+              <option value="preview">Preview</option>
+              <option value="undeployed">Devnet (Local)</option>
+            </select>
+          </div>
+          <div class="status-line"><span>Wallet Provider</span><strong id="wallet-provider-name">Detecting…</strong></div>
+          <div class="status-line"><span>Connection Status</span><strong id="wallet-status"><span class="badge">Not Connected</span></strong></div>
+          <div class="status-line"><span>Connected Address</span><strong id="wallet-address">None</strong></div>
+          <div class="status-line"><span>Shielded Address</span><strong id="shielded-address">None</strong></div>
+          <div class="status-line"><span>Unshielded Address</span><strong id="unshielded-address">None</strong></div>
         </div>
         <button type="button" id="wallet-action">Connect Wallet</button>
-        <p class="notice">Use a browser wallet such as Lace or Midnight to connect and authorize actions from your own account.</p>
+        <p style="margin-top: 1rem;" class="notice">
+          Connect your browser wallet extension (such as Lace or Midnight Wallet implementing <code>@midnight-ntwrk/dapp-connector-api</code>) to sign and execute escrow transactions.
+        </p>
       </section>
 
-      <div class="grid">
+      <div style="margin-top: 1.5rem;" class="grid">
         <section class="card">
           <h2>Create escrow</h2>
           <form id="create-form">
@@ -204,15 +245,21 @@
       const sellerAuthorityEl = document.getElementById('seller-authority');
       const responseEl = document.getElementById('response');
       const contractNoteEl = document.getElementById('contract-note');
+      
+      const networkSelectEl = document.getElementById('network-select');
+      const walletProviderNameEl = document.getElementById('wallet-provider-name');
       const walletStatusEl = document.getElementById('wallet-status');
       const walletAddressEl = document.getElementById('wallet-address');
+      const shieldedAddressEl = document.getElementById('shielded-address');
+      const unshieldedAddressEl = document.getElementById('unshielded-address');
       const walletActionButton = document.getElementById('wallet-action');
+
       const createForm = document.getElementById('create-form');
       const releaseForm = document.getElementById('release-form');
       const refundForm = document.getElementById('refund-form');
 
-      let connectedWalletAddress = null;
-      let walletProvider = null;
+      let activeWalletApi = null;
+      let connectedWalletDetails = null;
       let isActionPending = false;
 
       function setPending(isPending) {
@@ -221,93 +268,153 @@
         buttons.forEach((button) => { if (button) button.disabled = isPending; });
       }
 
-      function findBrowserWallet() {
-        if (window.lace) return window.lace;
-        if (window.midnight) return window.midnight;
-        return null;
-      }
+      /**
+       * Discover injected Midnight DApp Connector API wallet providers under window.midnight
+       * as specified by @midnight-ntwrk/dapp-connector-api.
+       */
+      function getAvailableWalletProviders() {
+        const providers = [];
+        if (typeof window === 'undefined') return providers;
 
-      async function getWalletAddress(provider, { allowPrompt = false } = {}) {
-        if (!provider) return null;
-
-        if (provider.getAccounts) {
-          const accounts = await provider.getAccounts();
-          if (Array.isArray(accounts) && accounts.length > 0) {
-            return accounts[0]?.address || accounts[0]?.bech32 || accounts[0]?.bech32Address || accounts[0];
+        if (window.midnight && typeof window.midnight === 'object') {
+          for (const key of Object.keys(window.midnight)) {
+            const candidate = window.midnight[key];
+            if (candidate && (typeof candidate.connect === 'function' || typeof candidate.enable === 'function')) {
+              providers.push({
+                rdns: candidate.rdns || key,
+                name: candidate.name || key,
+                icon: candidate.icon || null,
+                apiVersion: candidate.apiVersion || 'unknown',
+                initialApi: candidate,
+              });
+            }
           }
         }
 
-        if (provider.getConnectedAddresses) {
-          const addresses = await provider.getConnectedAddresses();
-          if (Array.isArray(addresses) && addresses.length > 0) return addresses[0];
+        if (providers.length === 0 && window.lace && (typeof window.lace.connect === 'function' || typeof window.lace.enable === 'function')) {
+          providers.push({
+            rdns: 'mnLace',
+            name: 'Lace Wallet',
+            icon: null,
+            apiVersion: '1.0.0',
+            initialApi: window.lace,
+          });
         }
 
-        if (provider.connect && allowPrompt) {
-          const connected = await provider.connect();
-          if (Array.isArray(connected) && connected.length > 0) {
-            return connected[0]?.address || connected[0]?.bech32 || connected[0]?.bech32Address || connected[0];
-          }
-          if (connected?.address) return connected.address;
-          if (connected?.bech32) return connected.bech32;
-          if (connected?.bech32Address) return connected.bech32Address;
-        }
-
-        return null;
+        return providers;
       }
 
-      async function updateWalletState() {
-        walletProvider = findBrowserWallet();
+      async function updateWalletStateDisplay() {
+        const providers = getAvailableWalletProviders();
 
-        if (!walletProvider) {
-          walletStatusEl.textContent = 'No wallet detected';
+        if (providers.length === 0) {
+          walletProviderNameEl.textContent = 'No DApp Connector found';
+          walletStatusEl.innerHTML = '<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(248, 113, 113, 0.3);">No Wallet Extension</span>';
           walletAddressEl.textContent = 'None';
-          walletActionButton.textContent = 'Install Wallet';
+          shieldedAddressEl.textContent = 'None';
+          unshieldedAddressEl.textContent = 'None';
+          walletActionButton.textContent = 'Install Lace / Midnight Wallet';
           walletActionButton.disabled = false;
           return;
         }
 
-        if (!connectedWalletAddress) {
-          const address = await getWalletAddress(walletProvider, { allowPrompt: false });
-          connectedWalletAddress = address;
-        }
+        const primaryProvider = providers[0];
+        walletProviderNameEl.textContent = `${primaryProvider.name} (${primaryProvider.rdns})`;
 
-        walletStatusEl.textContent = connectedWalletAddress ? 'Connected' : 'Disconnected';
-        walletAddressEl.textContent = connectedWalletAddress || 'None';
-        walletActionButton.textContent = connectedWalletAddress ? 'Disconnect Wallet' : 'Connect Wallet';
+        if (connectedWalletDetails) {
+          walletStatusEl.innerHTML = '<span class="badge connected">Connected</span>';
+          walletAddressEl.textContent = connectedWalletDetails.shieldedAddress || connectedWalletDetails.unshieldedAddress || connectedWalletDetails.address;
+          shieldedAddressEl.textContent = connectedWalletDetails.shieldedAddress || 'N/A';
+          unshieldedAddressEl.textContent = connectedWalletDetails.unshieldedAddress || 'N/A';
+          walletActionButton.textContent = 'Disconnect Wallet';
+        } else {
+          walletStatusEl.innerHTML = '<span class="badge">Disconnected</span>';
+          walletAddressEl.textContent = 'None';
+          shieldedAddressEl.textContent = 'None';
+          unshieldedAddressEl.textContent = 'None';
+          walletActionButton.textContent = 'Connect Wallet';
+        }
         walletActionButton.disabled = false;
       }
 
-      async function connectWallet() {
-        if (!walletProvider) throw new Error('No Midnight-compatible browser wallet is installed. Install Lace or Midnight wallet and refresh the page.');
-        const address = await getWalletAddress(walletProvider, { allowPrompt: true });
-        if (!address) throw new Error('Wallet connection was unsuccessful or no account was returned.');
-        connectedWalletAddress = address;
+      async function connectBrowserWallet() {
+        const providers = getAvailableWalletProviders();
+        if (providers.length === 0) {
+          throw new Error('No Midnight-compatible browser wallet extension was detected. Please install Lace or Midnight Wallet extension.');
+        }
+
+        const providerInfo = providers[0];
+        const selectedNetwork = networkSelectEl.value || 'preprod';
+        const initialApi = providerInfo.initialApi;
+
+        let connectedApi = null;
+        if (typeof initialApi.connect === 'function') {
+          connectedApi = await initialApi.connect(selectedNetwork);
+        } else if (typeof initialApi.enable === 'function') {
+          connectedApi = await initialApi.enable();
+        } else {
+          throw new Error('Wallet provider does not implement connect() or enable() method.');
+        }
+
+        let shielded = null;
+        let unshielded = null;
+
+        if (typeof connectedApi.getShieldedAddresses === 'function') {
+          try { shielded = await connectedApi.getShieldedAddresses(); } catch (e) {}
+        }
+        if (typeof connectedApi.getUnshieldedAddress === 'function') {
+          try { unshielded = await connectedApi.getUnshieldedAddress(); } catch (e) {}
+        }
+
+        const shieldedAddress = shielded?.shieldedAddress || (typeof shielded === 'string' ? shielded : null);
+        const unshieldedAddress = unshielded?.unshieldedAddress || (typeof unshielded === 'string' ? unshielded : null);
+        const primaryAddress = shieldedAddress || unshieldedAddress || 'connected';
+
+        activeWalletApi = connectedApi;
+        connectedWalletDetails = {
+          rdns: providerInfo.rdns,
+          name: providerInfo.name,
+          network: selectedNetwork,
+          address: primaryAddress,
+          shieldedAddress: shieldedAddress || '',
+          unshieldedAddress: unshieldedAddress || '',
+        };
+
+        try {
+          await fetchJson('/api/wallet/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(connectedWalletDetails),
+          });
+        } catch (e) {
+          // Log warning if backend endpoint notification failed
+          console.warn('Backend wallet registration notice:', e);
+        }
+
+        await updateWalletStateDisplay();
+        return connectedWalletDetails;
       }
 
-      async function disconnectWallet() {
-        if (walletProvider && walletProvider.disconnect) {
-          await walletProvider.disconnect();
+      async function disconnectBrowserWallet() {
+        if (activeWalletApi && typeof activeWalletApi.disconnect === 'function') {
+          try { await activeWalletApi.disconnect(); } catch (e) {}
         }
-        connectedWalletAddress = null;
+        activeWalletApi = null;
+        connectedWalletDetails = null;
+        await updateWalletStateDisplay();
       }
 
       walletActionButton.addEventListener('click', async () => {
         responseEl.textContent = '';
         setPending(true);
         try {
-          if (!walletProvider) {
-            throw new Error('No browser wallet detected. Install Lace or Midnight wallet and refresh the page.');
-          }
-
-          if (connectedWalletAddress) {
-            await disconnectWallet();
-            responseEl.textContent = 'Wallet disconnected.';
+          if (connectedWalletDetails) {
+            await disconnectBrowserWallet();
+            responseEl.textContent = 'Browser wallet disconnected.';
           } else {
-            await connectWallet();
-            responseEl.textContent = 'Wallet connected successfully.';
+            const details = await connectBrowserWallet();
+            responseEl.textContent = `Wallet connected successfully via @midnight-ntwrk/dapp-connector-api!\nAddress: ${details.address}`;
           }
-
-          await updateWalletState();
         } catch (error) {
           responseEl.textContent = error instanceof Error ? error.message : String(error);
         } finally {
@@ -315,11 +422,11 @@
         }
       });
 
-      function requireConnectedWallet() {
-        if (!connectedWalletAddress) {
-          throw new Error('Connect your browser wallet before submitting an escrow transaction.');
+      function requireConnectedBrowserWallet() {
+        if (!connectedWalletDetails) {
+          throw new Error('Please connect your browser wallet (Lace / Midnight Wallet) before executing escrow transactions.');
         }
-        return connectedWalletAddress;
+        return connectedWalletDetails;
       }
 
       async function fetchJson(path, options) {
@@ -340,6 +447,9 @@
         responseEl.textContent = 'Refreshing contract state…';
         try {
           const payload = await fetchJson('/api/escrow');
+          if (payload.network && networkSelectEl) {
+            networkSelectEl.value = payload.network;
+          }
           contractAddressEl.textContent = payload.contractAddress || '<YOUR_DEPLOYED_CONTRACT_ADDRESS>';
           escrowStatusEl.textContent = payload.statusName || payload.status || 'unknown';
           agreementEl.textContent = formatBytes(payload.agreementCommitment);
@@ -354,25 +464,29 @@
           agreementEl.textContent = 'Unavailable';
           buyerAuthorityEl.textContent = 'Unavailable';
           sellerAuthorityEl.textContent = 'Unavailable';
-          contractNoteEl.textContent = 'Set CONTRACT_ADDRESS to your deployed contract address and restart the server after deployment.';
+          contractNoteEl.textContent = 'Deploy contract to Preview/Preprod and configure CONTRACT_ADDRESS in environment or .midnight-state.json.';
           responseEl.textContent = message;
         }
       }
 
       createForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const walletAddress = requireConnectedWallet();
-        const formData = new FormData(createForm);
-        const payload = {
-          buyer: formData.get('buyer'),
-          seller: formData.get('seller'),
-          amount: formData.get('amount'),
-          terms: formData.get('terms'),
-          walletAddress,
-        };
-        responseEl.textContent = 'Creating escrow…';
-        setPending(true);
         try {
+          const wallet = requireConnectedBrowserWallet();
+          const formData = new FormData(createForm);
+          const payload = {
+            buyer: formData.get('buyer'),
+            seller: formData.get('seller'),
+            amount: formData.get('amount'),
+            terms: formData.get('terms'),
+            walletAddress: wallet.address,
+            shieldedAddress: wallet.shieldedAddress,
+            unshieldedAddress: wallet.unshieldedAddress,
+            rdns: wallet.rdns,
+          };
+          responseEl.textContent = 'Creating escrow circuit transaction…';
+          setPending(true);
+
           const result = await fetchJson('/api/escrows', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -389,12 +503,19 @@
 
       releaseForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const walletAddress = requireConnectedWallet();
-        const formData = new FormData(releaseForm);
-        const payload = { seller: formData.get('seller'), walletAddress };
-        responseEl.textContent = 'Releasing escrow…';
-        setPending(true);
         try {
+          const wallet = requireConnectedBrowserWallet();
+          const formData = new FormData(releaseForm);
+          const payload = {
+            seller: formData.get('seller'),
+            walletAddress: wallet.address,
+            shieldedAddress: wallet.shieldedAddress,
+            unshieldedAddress: wallet.unshieldedAddress,
+            rdns: wallet.rdns,
+          };
+          responseEl.textContent = 'Releasing escrow circuit transaction…';
+          setPending(true);
+
           const result = await fetchJson('/api/escrows/release', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -411,12 +532,19 @@
 
       refundForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const walletAddress = requireConnectedWallet();
-        const formData = new FormData(refundForm);
-        const payload = { buyer: formData.get('buyer'), walletAddress };
-        responseEl.textContent = 'Refunding escrow…';
-        setPending(true);
         try {
+          const wallet = requireConnectedBrowserWallet();
+          const formData = new FormData(refundForm);
+          const payload = {
+            buyer: formData.get('buyer'),
+            walletAddress: wallet.address,
+            shieldedAddress: wallet.shieldedAddress,
+            unshieldedAddress: wallet.unshieldedAddress,
+            rdns: wallet.rdns,
+          };
+          responseEl.textContent = 'Refunding escrow circuit transaction…';
+          setPending(true);
+
           const result = await fetchJson('/api/escrows/refund', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,9 +560,10 @@
       });
 
       window.addEventListener('load', async () => {
-        await updateWalletState();
+        await updateWalletStateDisplay();
         await refreshStatus();
       });
     </script>
   </body>
 </html>
+

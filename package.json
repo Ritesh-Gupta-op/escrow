@@ -10,6 +10,7 @@
     "compile": "npm run compact",
     "build": "npx tsc --noEmit",
     "start": "npx tsx src/server.ts",
+    "dev": "npx tsx src/server.ts",
     "setup": "npx tsx src/setup.ts",
     "deploy": "npx tsx src/deploy.ts",
     "cli": "npx tsx src/cli.ts",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/dapp-connector-api": "file:midnight-ntwrk-dapp-connector-api-4.0.1.tgz",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
@@ -45,5 +47,10 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "keywords": ["midnight", "blockchain", "zero-knowledge", "privacy"]
+  "keywords": [
+    "midnight",
+    "blockchain",
+    "zero-knowledge",
+    "privacy"
+  ]
 }

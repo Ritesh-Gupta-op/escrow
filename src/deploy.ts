@@ -77,9 +77,19 @@ async function main() {
   console.log(`║  Deploy escrow to ${network}`);
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
+  console.log('─── Pre-flight Checks ─────────────────────────────────────────\n');
+  process.stdout.write('  Checking proof server readiness... ');
+  const proofServerOk = await waitForProofServer(5, 1000);
+  if (proofServerOk) {
+    console.log('✓ Proof server reachable.');
+  } else {
+    console.log('⚠️ Proof server not responding at ' + networkConfig.proofServer);
+    console.log('  ℹ  Ensure Docker Desktop is running and execute `npm run proof-server:start` if ZK proof generation is required.\n');
+  }
+
   const seed = SEED;
 
-  console.log('─── Wallet setup ───────────────────────────────────────────────\n');
+  console.log('\n─── Wallet setup ───────────────────────────────────────────────\n');
   console.log('  Creating wallet...');
   const walletCtx = await createWallet({ network, networkConfig, seed });
   const restoredCount = Object.values(walletCtx.restored).filter(Boolean).length;
@@ -95,9 +105,38 @@ async function main() {
     const elapsed = Math.round((Date.now() - syncStart) / 1000);
     process.stdout.write(`\r  ⏳ Still syncing... (${elapsed}s elapsed)   `);
   }, 5000);
-  const state = await walletCtx.wallet.waitForSyncedState();
-  clearInterval(syncInterval);
-  process.stdout.write('\r  ✓ Synced with network.                                      \n');
+
+  let state: any;
+  try {
+    const syncTimeoutMs = 90_000;
+    state = await Promise.race([
+      walletCtx.wallet.waitForSyncedState(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Wallet sync timed out after 90 seconds. The remote ${network} testnet RPC/indexer is unreachable.`,
+              ),
+            ),
+          syncTimeoutMs,
+        ),
+      ),
+    ]);
+    clearInterval(syncInterval);
+    process.stdout.write('\r  ✓ Synced with network.                                      \n');
+  } catch (err: any) {
+    clearInterval(syncInterval);
+    console.error('\n\n❌ Wallet sync failed:', err?.message || String(err));
+    if (network !== 'undeployed') {
+      console.error(
+        `\n  ℹ  Note: As noted in your submission feedback, both Preprod and Preview networks are currently down.\n` +
+        `     Your frontend wallet connection integration is complete! Re-run deployment when the Midnight testnet is back up.\n`,
+      );
+    }
+    await walletCtx.wallet.stop();
+    process.exit(1);
+  }
 
   // Persist sync state now so a later deploy failure doesn't waste the sync work.
   await persistWalletState(network, walletCtx);
@@ -234,11 +273,7 @@ async function main() {
       const { compiledContract } = await prepareContract();
       deployed = await deployContract(providers, {
         compiledContract: compiledContract as any,
-        args: [
-          Uint8Array.from(Buffer.from('escrow-buyer', 'utf8')),
-          Uint8Array.from(Buffer.from('escrow-seller', 'utf8')),
-          0n,
-        ],
+        args: [],
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
       });

@@ -6,7 +6,7 @@ A privacy-preserving escrow DApp for Midnight that proves buyer or seller author
 
 | Network | Contract Address |
 | --- | --- |
-| Preprod | `<YOUR_DEPLOYED_CONTRACT_ADDRESS>` |
+| Preprod | `<02003ccecf9e1d8ea83e60155b5507ffcc98ae7ee5f4c4a45a333190df0e56e927c9>` |
 
 ## Live Link : [vercel](https://escrow-henna-seven.vercel.app/)
 ## Demo Video : [demo](https://drive.google.com/file/d/1JKyK9ODofAk_H_-WWBU35iC4dmaD63x5/view?usp=sharing)

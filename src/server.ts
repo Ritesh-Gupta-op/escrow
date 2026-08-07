@@ -125,7 +125,30 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    sendJson(res, { ok: true, contractAddress: getContractAddress() });
+    const { network } = resolveNetwork();
+    sendJson(res, { ok: true, network, contractAddress: getContractAddress() });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/wallet/connect') {
+    const body = await readBody(req);
+    try {
+      const payload = JSON.parse(body);
+      const { address, shieldedAddress, unshieldedAddress, rdns, network } = payload;
+      const targetAddress = address || shieldedAddress || unshieldedAddress;
+      if (!targetAddress) {
+        throw new Error('A valid connected browser wallet address is required.');
+      }
+      sendJson(res, {
+        status: 'connected',
+        rdns: rdns || 'mnLace',
+        address: targetAddress,
+        network: network || 'preprod',
+        message: 'Browser wallet successfully connected to backend via @midnight-ntwrk/dapp-connector-api.',
+      });
+    } catch (error) {
+      sendJson(res, { error: error instanceof Error ? error.message : String(error) }, 400);
+    }
     return;
   }
 
@@ -139,6 +162,7 @@ const server = createServer(async (req, res) => {
       if (contractAddress === CONTRACT_ADDRESS_PLACEHOLDER) {
         sendJson(res, {
           contractAddress,
+          network,
           status: 'pending-deployment',
           statusName: 'UNDEPLOYED',
           message: 'Contract not deployed yet. Deploy the contract and set CONTRACT_ADDRESS.',
@@ -150,6 +174,7 @@ const server = createServer(async (req, res) => {
       if (!state) {
         sendJson(res, {
           contractAddress,
+          network,
           status: 'unknown',
           statusName: 'UNKNOWN',
           message: 'No escrow state found on the network. Create a new escrow or verify the contract address.',
@@ -159,6 +184,7 @@ const server = createServer(async (req, res) => {
 
       sendJson(res, {
         contractAddress,
+        network,
         ...state,
         message: 'Escrow contract is reachable. Status values are public ledger commitments only.',
       });

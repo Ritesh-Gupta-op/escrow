@@ -18,6 +18,26 @@ globalThis.WebSocket = WebSocket;
 export const PRIVATE_STATE_ID = 'escrowPrivateState';
 export const CONTRACT_NAME = 'escrow';
 
+export interface EscrowPrivateState {
+  buyerAuthorizationSecret: Uint8Array;
+  sellerAuthorizationSecret: Uint8Array;
+}
+
+/**
+ * Compact witnesses read authorization material from encrypted private state.
+ * These values are never written to the public Midnight ledger.
+ */
+export const escrowWitnesses = {
+  buyerAuthorizationSecret: (context: { privateState: EscrowPrivateState }): [EscrowPrivateState, Uint8Array] => [
+    context.privateState,
+    context.privateState.buyerAuthorizationSecret,
+  ],
+  sellerAuthorizationSecret: (context: { privateState: EscrowPrivateState }): [EscrowPrivateState, Uint8Array] => [
+    context.privateState,
+    context.privateState.sellerAuthorizationSecret,
+  ],
+};
+
 export function getEscrowArtifactsPath(): string {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   return path.resolve(__dirname, '..', 'contracts', 'managed', CONTRACT_NAME);
@@ -32,9 +52,13 @@ export async function loadEscrowContract() {
   }
 
   const escrowModule = await import(pathToFileURL(contractPath).href);
-  const compiledContract = CompiledContract.make(CONTRACT_NAME, escrowModule.Contract).pipe(
-    CompiledContract.withVacantWitnesses,
-    CompiledContract.withCompiledFileAssets(zkConfigPath),
+  // Dynamic import prevents TypeScript from inferring generated contract types;
+  // retain runtime safety while binding the generated witnesses and ZK assets.
+  const bindWitnesses: any = CompiledContract.withWitnesses;
+  const bindAssets: any = CompiledContract.withCompiledFileAssets;
+  const compiledContract = bindAssets(
+    bindWitnesses(CompiledContract.make(CONTRACT_NAME, escrowModule.Contract), escrowWitnesses),
+    zkConfigPath,
   );
 
   return { compiledContract, zkConfigPath, escrowModule };

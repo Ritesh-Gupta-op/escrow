@@ -2,27 +2,78 @@ pragma language_version >= 0.23;
 
 import CompactStandardLibrary;
 
-export ledger status: Opaque<"string">;
-export ledger escrowHash: Bytes<32>;
-export ledger buyer: Bytes<32>;
-export ledger seller: Bytes<32>;
-export ledger amount: Uint<64>;
+/**
+ * Public ledger data
+ * - `status` records the escrow lifecycle.
+ * - `buyerAuthority`, `sellerAuthority`, and `agreementCommitment` are
+ *   cryptographic commitments. They are safe to disclose because their
+ *   preimages never enter the public ledger.
+ *
+ * Private data
+ * - The buyer and seller authorization secrets are supplied by witnesses.
+ * - The agreement terms, amount, and commitment randomness stay in the DApp
+ *   and are represented on-chain only by `agreementCommitment`.
+ *
+ * Privacy guarantee
+ * A caller proves that it knows the appropriate authorization secret to
+ * release or refund an escrow without disclosing that secret, either party's
+ * identity, the amount, or the agreement terms.
+ */
+enum EscrowStatus {
+  UNFUNDED,
+  FUNDED,
+  RELEASED,
+  REFUNDED
+}
 
-export witness escrowSecret(): Bytes<32>;
+export ledger status: EscrowStatus;
+export ledger buyerAuthority: Bytes<32>;
+export ledger sellerAuthority: Bytes<32>;
+export ledger agreementCommitment: Bytes<32>;
 
-export circuit createEscrow(buyerKey: Bytes<32>, sellerKey: Bytes<32>, depositAmount: Uint<64>): [] {
-  const secret = escrowSecret();
-  escrowHash = disclose(secret);
-  buyer = disclose(buyerKey);
-  seller = disclose(sellerKey);
-  amount = disclose(depositAmount);
-  status = disclose("funded");
+// Witnesses run in the caller's local DApp context; Compact never exposes
+// their results unless code explicitly calls disclose().
+witness buyerAuthorizationSecret(): Bytes<32>;
+witness sellerAuthorizationSecret(): Bytes<32>;
+
+circuit authorityCommitment(role: Bytes<32>, secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "midnight:escrow:authority:v1"),
+    role,
+    secret
+  ]);
+}
+
+export circuit createEscrow(
+  buyerSecret: Bytes<32>,
+  sellerSecret: Bytes<32>,
+  privateTermsCommitment: Bytes<32>
+): [] {
+  assert(status == EscrowStatus.UNFUNDED, "Escrow has already been funded");
+  const buyerCommitment = authorityCommitment(pad(32, "buyer"), buyerSecret);
+  const sellerCommitment = authorityCommitment(pad(32, "seller"), sellerSecret);
+  assert(buyerCommitment != sellerCommitment, "Buyer and seller must differ");
+
+  // These values are commitments, intentionally made public for later
+  // authorization and auditability. Their private preimages are not disclosed.
+  buyerAuthority = disclose(buyerCommitment);
+  sellerAuthority = disclose(sellerCommitment);
+  agreementCommitment = disclose(privateTermsCommitment);
+  status = EscrowStatus.FUNDED;
 }
 
 export circuit releaseEscrow(): [] {
-  status = disclose("released");
+  assert(status == EscrowStatus.FUNDED, "Escrow is not funded");
+  const sellerSecret = sellerAuthorizationSecret();
+  const expectedAuthority = authorityCommitment(pad(32, "seller"), sellerSecret);
+  assert(expectedAuthority == sellerAuthority, "Operation not permitted");
+  status = EscrowStatus.RELEASED;
 }
 
-export circuit cancelEscrow(): [] {
-  status = disclose("cancelled");
+export circuit refundEscrow(): [] {
+  assert(status == EscrowStatus.FUNDED, "Escrow is not funded");
+  const buyerSecret = buyerAuthorizationSecret();
+  const expectedAuthority = authorityCommitment(pad(32, "buyer"), buyerSecret);
+  assert(expectedAuthority == buyerAuthority, "Operation not permitted");
+  status = EscrowStatus.REFUNDED;
 }

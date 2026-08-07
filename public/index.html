@@ -3,133 +3,412 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Escrow DApp</title>
+    <title>Minimalist Editorial — Escrow DApp</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
       :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
-        background: #07111f;
-        color: #f8fbff;
+        --font-serif: 'Instrument Serif', Georgia, serif;
+        --font-sans: 'Inter', system-ui, sans-serif;
+        --color-primary-text: #0f172a;
+        --color-muted-text: hsl(215, 25%, 32%);
+        --color-action-bg: #000000;
+        --color-action-text: #ffffff;
+        --color-bg-basis: hsl(201, 100%, 13%);
       }
+
       * {
         box-sizing: border-box;
       }
-      body {
+
+      html, body {
         margin: 0;
+        padding: 0;
+        font-family: var(--font-sans);
+        background-color: var(--color-bg-basis);
+        color: var(--color-primary-text);
+        scroll-behavior: smooth;
+        overflow-x: hidden;
+      }
+
+      /* Background Video & Overlay */
+      .hero-viewport {
+        position: relative;
         min-height: 100vh;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--color-bg-basis);
+        overflow: hidden;
+      }
+
+      .video-bg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        z-index: 0;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+      }
+
+      .video-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.2);
+        z-index: 1;
+      }
+
+      /* Navigation Bar */
+      .navbar-container {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 1280px;
+        padding: 24px 32px;
         display: grid;
-        place-items: center;
-        padding: 1.5rem;
-        background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.15), transparent 35%),
-          radial-gradient(circle at bottom right, rgba(147, 51, 234, 0.12), transparent 30%);
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        margin: 0 auto;
       }
-      .page {
-        width: min(100%, 980px);
-        padding: 1.5rem;
+
+      .nav-logo {
+        font-family: var(--font-serif);
+        font-size: 30px;
+        font-weight: 400;
+        color: #ffffff;
+        text-decoration: none;
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: baseline;
       }
-      .hero {
-        margin-bottom: 1rem;
+
+      .nav-logo sup {
+        font-size: 14px;
+        margin-left: 2px;
+        font-family: var(--font-sans);
       }
-      .hero h1 {
-        margin: 0 0 0.5rem;
-        font-size: clamp(2rem, 4vw, 3.2rem);
-      }
-      .hero p {
+
+      .nav-links {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 40px;
+        list-style: none;
         margin: 0;
-        max-width: 44rem;
-        line-height: 1.7;
-        color: #c6d3e8;
+        padding: 0;
       }
+
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+        .navbar-container {
+          grid-template-columns: 1fr auto;
+        }
+      }
+
+      .nav-link {
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: none;
+        transition: color 0.2s ease;
+      }
+
+      .nav-link:hover {
+        color: #ffffff;
+      }
+
+      /* Pill Action Button Component */
+      .pill-btn {
+        border-radius: 9999px;
+        background-color: var(--color-action-bg);
+        color: var(--color-action-text);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-family: var(--font-sans);
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: transform 200ms ease-in-out, background-color 200ms ease-in-out, border-color 200ms ease-in-out;
+      }
+
+      .pill-btn:hover:not(:disabled) {
+        transform: scale(1.03);
+        background-color: #1a1a1a;
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+
+      .pill-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .pill-btn-sm {
+        padding: 10px 24px;
+        font-size: 14px;
+      }
+
+      .pill-btn-hero {
+        padding: 20px 56px;
+        font-size: 16px;
+        margin-top: 48px;
+      }
+
+      /* Hero Content & Animations */
+      .hero-content {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 1280px;
+        padding: 0 32px 64px;
+        margin: auto;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      @keyframes fadeRise {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-fade-rise {
+        animation: fadeRise 0.8s ease-out forwards;
+      }
+
+      .delay-0 {
+        animation-delay: 0s;
+      }
+
+      .delay-200 {
+        animation-delay: 0.2s;
+        opacity: 0;
+      }
+
+      .delay-400 {
+        animation-delay: 0.4s;
+        opacity: 0;
+      }
+
+      .hero-title {
+        font-family: var(--font-serif);
+        font-weight: 400;
+        font-size: 80px;
+        line-height: 0.95;
+        letter-spacing: -2.46px;
+        color: #ffffff;
+        margin: 0 0 24px 0;
+        max-width: 960px;
+      }
+
+      .hero-title em {
+        font-style: normal;
+        font-family: var(--font-serif);
+        color: #f8fafc;
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 8px;
+      }
+
+      @media (max-width: 768px) {
+        .hero-title {
+          font-size: 48px;
+          letter-spacing: -1.5px;
+        }
+      }
+
+      .hero-paragraph {
+        font-family: var(--font-sans);
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1.625;
+        color: #e2e8f0;
+        max-width: 670px;
+        margin: 0 auto;
+      }
+
+      /* DApp Application Workspace Section */
+      .dapp-workspace {
+        position: relative;
+        z-index: 20;
+        background: #0f172a;
+        color: #f8fbff;
+        padding: 4rem 1.5rem;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .page-container {
+        width: min(100%, 1100px);
+      }
+
+      .section-heading {
+        font-family: var(--font-serif);
+        font-size: 42px;
+        font-weight: 400;
+        margin-bottom: 0.5rem;
+        letter-spacing: -1px;
+        color: #ffffff;
+      }
+
+      .section-subhead {
+        font-family: var(--font-sans);
+        font-size: 16px;
+        color: #94a3b8;
+        margin-top: 0;
+        margin-bottom: 2.5rem;
+      }
+
       .grid {
         display: grid;
         gap: 1.5rem;
       }
+
       .grid-2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
       @media (max-width: 768px) {
         .grid-2 {
           grid-template-columns: 1fr;
         }
       }
+
       .card {
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 1.25rem;
-        background: rgba(255, 255, 255, 0.04);
-        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        padding: 1.75rem;
       }
+
       .card h2 {
         margin-top: 0;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 20px;
       }
+
       label {
         display: block;
         margin-top: 1rem;
-        font-weight: 700;
+        font-weight: 600;
+        font-size: 14px;
+        color: #cbd5e1;
       }
+
       input,
       select,
-      textarea,
-      button {
+      textarea {
         width: 100%;
         border-radius: 0.75rem;
         border: 1px solid rgba(255, 255, 255, 0.15);
         background: rgba(255, 255, 255, 0.05);
         color: #f8fbff;
-        font: inherit;
+        font-family: var(--font-sans);
+        font-size: 14px;
         padding: 0.95rem 1rem;
+        margin-top: 0.4rem;
       }
+
       select option {
         background: #0f172a;
         color: #f8fbff;
       }
+
       textarea {
-        min-height: 120px;
+        min-height: 110px;
         resize: vertical;
       }
-      button {
+
+      .form-btn {
         margin-top: 1.25rem;
+        width: 100%;
+        padding: 1rem;
+        border-radius: 0.75rem;
         background: linear-gradient(135deg, #2563eb, #9333ea);
         border: none;
         color: white;
-        font-weight: 700;
+        font-family: var(--font-sans);
+        font-weight: 600;
         cursor: pointer;
-        transition: opacity 0.2s;
+        transition: opacity 0.2s, transform 0.2s;
       }
-      button:hover:not(:disabled) {
-        opacity: 0.9;
+
+      .form-btn:hover:not(:disabled) {
+        opacity: 0.95;
+        transform: translateY(-1px);
       }
-      button:disabled {
+
+      .form-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
+
       .status {
         display: grid;
-        gap: 0.75rem;
+        gap: 0.85rem;
       }
+
       .status-line {
         display: flex;
         justify-content: space-between;
         gap: 1rem;
         flex-wrap: wrap;
+        font-size: 14px;
       }
+
       .status-line span:first-child {
-        color: #98a8c6;
+        color: #94a3b8;
       }
+
       .panel {
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 1rem;
         padding: 1rem;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+        color: #e2e8f0;
       }
+
       .notice {
-        margin: 0;
+        margin: 1rem 0 0;
         padding: 1rem;
         border-radius: 1rem;
         background: rgba(91, 33, 182, 0.16);
         color: #d8dcff;
+        font-size: 13px;
+        line-height: 1.5;
       }
+
       .badge {
         display: inline-block;
         padding: 0.25rem 0.6rem;
@@ -140,102 +419,156 @@
         color: #60a5fa;
         border: 1px solid rgba(96, 165, 250, 0.3);
       }
+
       .badge.connected {
         background: rgba(34, 197, 94, 0.2);
         color: #4ade80;
         border-color: rgba(74, 222, 128, 0.3);
       }
+
       .controls {
         display: grid;
-        gap: 1rem;
+        gap: 1.5rem;
       }
     </style>
   </head>
   <body>
-    <div class="page">
-      <section class="hero">
-        <h1>Escrow DApp</h1>
-        <p>Interact with the private escrow contract. Create an escrow with confidential terms, then release or refund it using authorization secrets without revealing them on-chain.</p>
-      </section>
+    <!-- Full-Bleed Video Hero Container -->
+    <div class="hero-viewport">
+      <video autoplay loop muted playsinline class="video-bg">
+        <source src="https://designerstephen.github.io/public-assets/videos/serene-art-hero.mp4" type="video/mp4" />
+      </video>
+      <div class="video-overlay"></div>
 
-      <div class="grid grid-2">
-        <section class="card">
-          <h2>Escrow status</h2>
-          <div class="status">
-            <div class="status-line"><span>Contract</span><strong id="contract-address">Loading…</strong></div>
-            <div class="status-line"><span>Status</span><strong id="escrow-status">Loading…</strong></div>
-            <div class="status-line"><span>Agreement commitment</span><strong id="agreement-commitment">Loading…</strong></div>
-            <div class="status-line"><span>Buyer authority</span><strong id="buyer-authority">Loading…</strong></div>
-            <div class="status-line"><span>Seller authority</span><strong id="seller-authority">Loading…</strong></div>
-          </div>
-          <div style="margin-top: 1rem;" class="panel" id="contract-note">Loading the contract details…</div>
-        </section>
+      <!-- 3-Column Navigation Bar -->
+      <header class="navbar-container">
+        <!-- Left Col -->
+        <a href="#" class="nav-logo">
+          Escrow<sup>®</sup>
+        </a>
 
-        <section class="card">
-          <h2>Latest response</h2>
-          <div class="panel" id="response">Refreshing status…</div>
-        </section>
-      </div>
+        <!-- Center Col -->
+        <ul class="nav-links">
+          <li><a href="#dapp-workspace" class="nav-link">Collections</a></li>
+          <li><a href="#dapp-workspace" class="nav-link">Privacy Protocol</a></li>
+          <li><a href="#escrow-status-card" class="nav-link">Escrow Status</a></li>
+          <li><a href="#wallet-card" class="nav-link">Documentation</a></li>
+        </ul>
 
-      <section style="margin-top: 1.5rem;" class="card">
-        <h2>Frontend Wallet Connection (@midnight-ntwrk/dapp-connector-api)</h2>
-        <div class="status">
-          <div class="status-line"><span>Target Network</span>
-            <select id="network-select" style="width: auto; padding: 0.4rem 0.8rem; margin: 0;">
-              <option value="preprod" selected>Preprod</option>
-              <option value="preview">Preview</option>
-              <option value="undeployed">Devnet (Local)</option>
-            </select>
-          </div>
-          <div class="status-line"><span>Wallet Provider</span><strong id="wallet-provider-name">Detecting…</strong></div>
-          <div class="status-line"><span>Connection Status</span><strong id="wallet-status"><span class="badge">Not Connected</span></strong></div>
-          <div class="status-line"><span>Connected Address</span><strong id="wallet-address">None</strong></div>
-          <div class="status-line"><span>Shielded Address</span><strong id="shielded-address">None</strong></div>
-          <div class="status-line"><span>Unshielded Address</span><strong id="unshielded-address">None</strong></div>
-        </div>
-        <button type="button" id="wallet-action">Connect Wallet</button>
-        <p style="margin-top: 1rem;" class="notice">
-          Connect your browser wallet extension (such as Lace or Midnight Wallet implementing <code>@midnight-ntwrk/dapp-connector-api</code>) to sign and execute escrow transactions.
+        <!-- Right Col -->
+        <button type="button" class="pill-btn pill-btn-sm" id="nav-connect-btn">
+          Find my dream
+        </button>
+      </header>
+
+      <!-- Centered Hero Content -->
+      <main class="hero-content">
+        <h1 class="hero-title animate-fade-rise delay-0">
+          Private <em>Escrow</em> Architecture
+        </h1>
+        <p class="hero-paragraph animate-fade-rise delay-200">
+          A minimalist, high-end cryptographic escrow protocol powered by Midnight zero-knowledge circuits. Create confidential agreements and authorize releases without revealing private preimages on-chain.
         </p>
-      </section>
-
-      <div style="margin-top: 1.5rem;" class="grid">
-        <section class="card">
-          <h2>Create escrow</h2>
-          <form id="create-form">
-            <label>Buyer authorization secret</label>
-            <input name="buyer" type="password" autocomplete="new-password" required minlength="12" />
-            <label>Seller authorization secret</label>
-            <input name="seller" type="password" autocomplete="new-password" required minlength="12" />
-            <label>Amount</label>
-            <input name="amount" type="number" min="1" step="1" value="100" required />
-            <label>Agreement terms</label>
-            <textarea name="terms" placeholder="Describe the agreement terms in private"></textarea>
-            <button type="submit">Create escrow</button>
-          </form>
-        </section>
-
-        <section class="card controls">
-          <div>
-            <h2>Release escrow</h2>
-            <form id="release-form">
-              <label>Seller authorization secret</label>
-              <input name="seller" type="password" autocomplete="current-password" minlength="12" required />
-              <button type="submit">Release</button>
-            </form>
-          </div>
-
-          <div>
-            <h2>Refund escrow</h2>
-            <form id="refund-form">
-              <label>Buyer authorization secret</label>
-              <input name="buyer" type="password" autocomplete="current-password" minlength="12" required />
-              <button type="submit">Refund</button>
-            </form>
-          </div>
-        </section>
-      </div>
+        <a href="#dapp-workspace" class="pill-btn pill-btn-hero animate-fade-rise delay-400">
+          Explore Escrow DApp
+        </a>
+      </main>
     </div>
+
+    <!-- Escrow DApp Interactive Workspace -->
+    <section class="dapp-workspace" id="dapp-workspace">
+      <div class="page-container">
+        <h2 class="section-heading">Escrow Control Center</h2>
+        <p class="section-subhead">
+          Connect your browser wallet via <code>@midnight-ntwrk/dapp-connector-api</code> to execute zero-knowledge circuit transactions.
+        </p>
+
+        <div class="grid grid-2">
+          <!-- Escrow Status Card -->
+          <section class="card" id="escrow-status-card">
+            <h2>Escrow Ledger Status</h2>
+            <div class="status">
+              <div class="status-line"><span>Contract Address</span><strong id="contract-address">Loading…</strong></div>
+              <div class="status-line"><span>Status</span><strong id="escrow-status">Loading…</strong></div>
+              <div class="status-line"><span>Agreement Commitment</span><strong id="agreement-commitment">Loading…</strong></div>
+              <div class="status-line"><span>Buyer Authority</span><strong id="buyer-authority">Loading…</strong></div>
+              <div class="status-line"><span>Seller Authority</span><strong id="seller-authority">Loading…</strong></div>
+            </div>
+            <div style="margin-top: 1rem;" class="panel" id="contract-note">Loading contract details…</div>
+          </section>
+
+          <!-- Response Panel -->
+          <section class="card">
+            <h2>Circuit Response</h2>
+            <div class="panel" id="response">Refreshing status…</div>
+          </section>
+        </div>
+
+        <!-- Wallet Connection Card -->
+        <section style="margin-top: 1.5rem;" class="card" id="wallet-card">
+          <h2>Frontend Wallet Connection (@midnight-ntwrk/dapp-connector-api)</h2>
+          <div class="status">
+            <div class="status-line">
+              <span>Target Network</span>
+              <select id="network-select" style="width: auto; padding: 0.4rem 0.8rem; margin: 0;">
+                <option value="preprod" selected>Preprod</option>
+                <option value="preview">Preview</option>
+                <option value="undeployed">Devnet (Local)</option>
+              </select>
+            </div>
+            <div class="status-line"><span>Wallet Provider</span><strong id="wallet-provider-name">Detecting…</strong></div>
+            <div class="status-line"><span>Connection Status</span><strong id="wallet-status"><span class="badge">Not Connected</span></strong></div>
+            <div class="status-line"><span>Connected Address</span><strong id="wallet-address">None</strong></div>
+            <div class="status-line"><span>Shielded Address</span><strong id="shielded-address">None</strong></div>
+            <div class="status-line"><span>Unshielded Address</span><strong id="unshielded-address">None</strong></div>
+          </div>
+          <button type="button" class="pill-btn pill-btn-sm" style="margin-top: 1.25rem; width: 100%; border: none;" id="wallet-action">Connect Wallet</button>
+          <p class="notice">
+            Connect your browser wallet extension (such as Lace or Midnight Wallet implementing <code>@midnight-ntwrk/dapp-connector-api</code>) to sign and execute escrow transactions.
+          </p>
+        </section>
+
+        <!-- Transaction Action Forms -->
+        <div style="margin-top: 1.5rem;" class="grid">
+          <!-- Create Escrow Form -->
+          <section class="card">
+            <h2>Create Escrow</h2>
+            <form id="create-form">
+              <label>Buyer authorization secret</label>
+              <input name="buyer" type="password" autocomplete="new-password" required minlength="12" placeholder="At least 12 characters" />
+              <label>Seller authorization secret</label>
+              <input name="seller" type="password" autocomplete="new-password" required minlength="12" placeholder="At least 12 characters" />
+              <label>Amount</label>
+              <input name="amount" type="number" min="1" step="1" value="100" required />
+              <label>Agreement terms</label>
+              <textarea name="terms" placeholder="Describe the agreement terms in private"></textarea>
+              <button type="submit" class="form-btn">Create Escrow Circuit Transaction</button>
+            </form>
+          </section>
+
+          <!-- Controls Section: Release & Refund -->
+          <section class="card controls">
+            <div>
+              <h2>Release Escrow</h2>
+              <form id="release-form">
+                <label>Seller authorization secret</label>
+                <input name="seller" type="password" autocomplete="current-password" minlength="12" required placeholder="Enter seller secret" />
+                <button type="submit" class="form-btn">Release Escrow Circuit Call</button>
+              </form>
+            </div>
+
+            <div>
+              <h2>Refund Escrow</h2>
+              <form id="refund-form">
+                <label>Buyer authorization secret</label>
+                <input name="buyer" type="password" autocomplete="current-password" minlength="12" required placeholder="Enter buyer secret" />
+                <button type="submit" class="form-btn">Refund Escrow Circuit Call</button>
+              </form>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
 
     <script>
       const contractAddressEl = document.getElementById('contract-address');
@@ -253,6 +586,7 @@
       const shieldedAddressEl = document.getElementById('shielded-address');
       const unshieldedAddressEl = document.getElementById('unshielded-address');
       const walletActionButton = document.getElementById('wallet-action');
+      const navConnectBtn = document.getElementById('nav-connect-btn');
 
       const createForm = document.getElementById('create-form');
       const releaseForm = document.getElementById('release-form');
@@ -264,7 +598,7 @@
 
       function setPending(isPending) {
         isActionPending = isPending;
-        const buttons = [walletActionButton, createForm.querySelector('button'), releaseForm.querySelector('button'), refundForm.querySelector('button')];
+        const buttons = [walletActionButton, navConnectBtn, createForm.querySelector('button'), releaseForm.querySelector('button'), refundForm.querySelector('button')];
         buttons.forEach((button) => { if (button) button.disabled = isPending; });
       }
 
@@ -314,6 +648,7 @@
           shieldedAddressEl.textContent = 'None';
           unshieldedAddressEl.textContent = 'None';
           walletActionButton.textContent = 'Install Lace / Midnight Wallet';
+          navConnectBtn.textContent = 'Connect Wallet';
           walletActionButton.disabled = false;
           return;
         }
@@ -327,12 +662,14 @@
           shieldedAddressEl.textContent = connectedWalletDetails.shieldedAddress || 'N/A';
           unshieldedAddressEl.textContent = connectedWalletDetails.unshieldedAddress || 'N/A';
           walletActionButton.textContent = 'Disconnect Wallet';
+          navConnectBtn.textContent = 'Disconnect';
         } else {
           walletStatusEl.innerHTML = '<span class="badge">Disconnected</span>';
           walletAddressEl.textContent = 'None';
           shieldedAddressEl.textContent = 'None';
           unshieldedAddressEl.textContent = 'None';
           walletActionButton.textContent = 'Connect Wallet';
+          navConnectBtn.textContent = 'Find my dream';
         }
         walletActionButton.disabled = false;
       }
@@ -387,7 +724,6 @@
             body: JSON.stringify(connectedWalletDetails),
           });
         } catch (e) {
-          // Log warning if backend endpoint notification failed
           console.warn('Backend wallet registration notice:', e);
         }
 
@@ -404,7 +740,7 @@
         await updateWalletStateDisplay();
       }
 
-      walletActionButton.addEventListener('click', async () => {
+      async function handleWalletAction() {
         responseEl.textContent = '';
         setPending(true);
         try {
@@ -420,7 +756,10 @@
         } finally {
           setPending(false);
         }
-      });
+      }
+
+      walletActionButton.addEventListener('click', handleWalletAction);
+      navConnectBtn.addEventListener('click', handleWalletAction);
 
       function requireConnectedBrowserWallet() {
         if (!connectedWalletDetails) {
@@ -566,4 +905,3 @@
     </script>
   </body>
 </html>
-

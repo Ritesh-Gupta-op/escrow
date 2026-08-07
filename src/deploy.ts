@@ -1,3 +1,4 @@
+
 /**
  * Deploy escrow contract to a Midnight network (undeployed by default; use --network preview|preprod for public networks).
  *
@@ -149,7 +150,7 @@ async function main() {
   if (network === 'undeployed' && balance === 0n) {
     console.error(
       '\n❌ Genesis-seed wallet has zero NIGHT. The devnet preset may not have minted to it.\n' +
-        '   Check `docker compose ps` and `docker compose logs node`. Then `docker compose down -v` and retry.\n',
+      '   Check `docker compose ps` and `docker compose logs node`. Then `docker compose down -v` and retry.\n',
     );
     await walletCtx.wallet.stop();
     process.exit(1);

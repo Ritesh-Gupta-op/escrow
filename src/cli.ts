@@ -4,6 +4,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Buffer } from 'buffer';
+import { createHash, randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
@@ -17,6 +18,10 @@ globalThis.WebSocket = WebSocket;
 
 const { network, config: networkConfig } = resolveNetwork();
 const SEED = getOrCreateSeed(network);
+
+function secretBytes(value: string): Uint8Array {
+  return new Uint8Array(createHash('sha256').update(value, 'utf8').digest());
+}
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
@@ -63,11 +68,12 @@ async function main() {
           const buyer = await rl.question('  Buyer identifier: ');
           const seller = await rl.question('  Seller identifier: ');
           const amount = await rl.question('  Amount: ');
-          const buyerBytes = new Uint8Array(32);
-          const sellerBytes = new Uint8Array(32);
-          buyerBytes.set(Buffer.from(buyer));
-          sellerBytes.set(Buffer.from(seller));
-          const tx = await deployed.callTx.createEscrow(buyerBytes, sellerBytes, BigInt(amount));
+          if (!amount || Number(amount) <= 0) throw new Error('Amount must be greater than zero.');
+          const tx = await deployed.callTx.createEscrow(
+            secretBytes(buyer),
+            secretBytes(seller),
+            new Uint8Array(randomBytes(32)),
+          );
           console.log(`\n  ✅ Escrow created: ${tx.public.txId}\n`);
           break;
         }
@@ -75,8 +81,8 @@ async function main() {
           const state = await providers.publicDataProvider.queryContractState(deployment.address);
           if (state) {
             const ledgerState = escrowModule.ledger(state.data);
-            console.log(`\n  Status: ${Buffer.from(ledgerState.status).toString()}`);
-            console.log(`  Amount: ${ledgerState.amount.toString()}`);
+            console.log(`\n  Escrow status code: ${ledgerState.status}`);
+            console.log('  Agreement details remain private.');
           }
           break;
         }
@@ -86,8 +92,8 @@ async function main() {
           break;
         }
         case '4': {
-          const tx = await deployed.callTx.cancelEscrow();
-          console.log(`\n  ✅ Escrow cancelled: ${tx.public.txId}\n`);
+          const tx = await deployed.callTx.refundEscrow();
+          console.log(`\n  ✅ Escrow refunded: ${tx.public.txId}\n`);
           break;
         }
         case '5': {

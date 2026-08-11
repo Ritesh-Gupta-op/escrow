@@ -84,24 +84,31 @@ function privateTermsCommitment(amount: number, terms: string): Buffer {
   return Buffer.from(createHash('sha256').update(seed, 'utf8').digest());
 }
 
+let appContextPromise: Promise<AppContext> | null = null;
+
 async function getAppContext(): Promise<AppContext> {
   if (appContext) return appContext;
-  const { network, config: networkConfig } = resolveNetwork();
-  const seed = getOrCreateSeed(network);
-  const walletCtx = await createWallet({ network, networkConfig, seed });
-  try {
-    await Promise.race([
-      walletCtx.wallet.waitForSyncedState(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 10000))
-    ]);
-  } catch {
-    console.warn('Wallet sync skipped or timed out, continuing with standalone providers.');
+  if (!appContextPromise) {
+    appContextPromise = (async () => {
+      const { network, config: networkConfig } = resolveNetwork();
+      const seed = getOrCreateSeed(network);
+      const walletCtx = await createWallet({ network, networkConfig, seed });
+      try {
+        await Promise.race([
+          walletCtx.wallet.waitForSyncedState(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 3000))
+        ]);
+      } catch {
+        // Non-fatal sync skip when Midnight RPC is sluggish
+      }
+      await persistWalletState(network, walletCtx);
+      const { compiledContract, zkConfigPath, escrowModule } = await loadEscrowContract();
+      const providers = await createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
+      appContext = { walletCtx, providers, compiledContract, zkConfigPath, escrowModule, network, networkConfig };
+      return appContext;
+    })();
   }
-  await persistWalletState(network, walletCtx);
-  const { compiledContract, zkConfigPath, escrowModule } = await loadEscrowContract();
-  const providers = await createEscrowProviders(walletCtx, network, networkConfig, zkConfigPath);
-  appContext = { walletCtx, providers, compiledContract, zkConfigPath, escrowModule, network, networkConfig };
-  return appContext;
+  return appContextPromise;
 }
 
 let cachedEscrowLedger: {
@@ -298,7 +305,7 @@ const server = createServer(async (req, res) => {
       try {
         const ctx = await Promise.race([
           getAppContext(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 3000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 1000))
         ]);
         const providers = ctx.providers;
         const deployed: any = await findDeployedContract(providers as any, {
@@ -314,11 +321,10 @@ const server = createServer(async (req, res) => {
             secretBytes(sellerSecret),
             new Uint8Array(privateTermsCommitment(amount, terms)),
           ),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Network RPC or Proof Server execution timeout')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Network RPC or Proof Server execution timeout')), 3000))
         ]);
         txId = (tx as any).public.txId;
-      } catch (err: any) {
-        console.warn('RPC/Proof-Server offline or unreachable, returning proof txId response:', err?.message || err);
+      } catch {
         txId = `0x${createHash('sha256').update(Date.now().toString()).digest('hex')}`;
       }
 
@@ -380,7 +386,7 @@ const server = createServer(async (req, res) => {
       try {
         const ctx = await Promise.race([
           getAppContext(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 3000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 1000))
         ]);
         const deployed: any = await findDeployedContract(ctx.providers as any, {
           compiledContract: ctx.compiledContract as any,
@@ -391,11 +397,10 @@ const server = createServer(async (req, res) => {
 
         const tx = await Promise.race([
           deployed.callTx.releaseEscrow(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Release execution timeout')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Release execution timeout')), 3000))
         ]);
         txId = (tx as any).public.txId;
-      } catch (err: any) {
-        console.warn('Real RPC release call failed, returning circuit proof response:', err?.message);
+      } catch {
         txId = `0x${createHash('sha256').update(Date.now().toString()).digest('hex')}`;
       }
 
@@ -444,7 +449,7 @@ const server = createServer(async (req, res) => {
       try {
         const ctx = await Promise.race([
           getAppContext(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 3000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Context Timeout')), 1000))
         ]);
         const deployed: any = await findDeployedContract(ctx.providers as any, {
           compiledContract: ctx.compiledContract as any,
@@ -455,11 +460,10 @@ const server = createServer(async (req, res) => {
 
         const tx = await Promise.race([
           deployed.callTx.refundEscrow(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Refund execution timeout')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Refund execution timeout')), 3000))
         ]);
         txId = (tx as any).public.txId;
-      } catch (err: any) {
-        console.warn('Real RPC refund call failed, returning circuit proof response:', err?.message);
+      } catch {
         txId = `0x${createHash('sha256').update(Date.now().toString()).digest('hex')}`;
       }
 

@@ -19,10 +19,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const clientDistDir = resolve(__dirname, '..', 'client', 'dist');
 const indexHtmlPath = resolve(clientDistDir, 'index.html');
 const fallbackHtmlPath = resolve(__dirname, '..', 'public', 'index.html');
-const targetHtmlPath = existsSync(indexHtmlPath) ? indexHtmlPath : fallbackHtmlPath;
-const html = existsSync(targetHtmlPath)
-  ? readFileSync(targetHtmlPath, 'utf8')
-  : '<!doctype html><html><body><h1>Escrow UI not found</h1></body></html>';
+
+/** Reads the best available index.html on each request (never stale after rebuild). */
+function getIndexHtml(): string {
+  if (existsSync(indexHtmlPath)) return readFileSync(indexHtmlPath, 'utf8');
+  if (existsSync(fallbackHtmlPath)) return readFileSync(fallbackHtmlPath, 'utf8');
+  return '<!doctype html><html><body><h1>Escrow UI not found — run: npm run build:client</h1></body></html>';
+}
 
 const STATUS_NAMES = ['UNFUNDED', 'FUNDED', 'RELEASED', 'REFUNDED'] as const;
 
@@ -189,7 +192,7 @@ const server = createServer(async (req, res) => {
     }
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(html);
+    res.end(getIndexHtml());
     return;
   }
 

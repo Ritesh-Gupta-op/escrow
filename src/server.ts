@@ -126,8 +126,7 @@ async function loadEscrowState(contractAddress: string) {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Context timeout')), 3000))
     ]);
     const state = await Promise.race([
-      // queryContractState uses the full address (with prefix) — that is correct for the Midnight indexer
-      ctx.providers.publicDataProvider.queryContractState(contractAddress),
+      ctx.providers.publicDataProvider.queryContractState(normalizeContractAddress(contractAddress)),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Indexer query timeout')), 3000))
     ]);
     if (state?.data) {

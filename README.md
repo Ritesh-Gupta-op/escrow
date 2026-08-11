@@ -13,9 +13,31 @@ Midnight Escrow is a privacy-preserving digital agreement DApp built natively on
 
 ---
 
+## UI Screenshots
+
+<img width="1902" height="856" alt="Midnight Escrow Hero Landing" src="https://github.com/user-attachments/assets/7f8c3f80-16bd-46fd-860d-8f122bda071a" />
+
+<img width="1864" height="834" alt="Midnight Escrow Control Center" src="https://github.com/user-attachments/assets/94ab9aff-b35f-4b05-a0a8-c841b9b2a096" />
+
+---
+
 ## Initial Product Idea
 
 Midnight Escrow is a privacy-preserving digital agreement framework designed to solve transaction counterparty risk without exposing high-stakes commercial terms or participant identities on-chain. Built natively on Midnight's zero-knowledge layer, the application locks obligations behind cryptographic commitment schemes (`buyerAuthority`, `sellerAuthority`, and `agreementCommitment`), allowing escrow release or refund actions to execute only when secret preimages are proven via Compact ZK circuits. This model protects sensitive deal amounts, agreement terms, and participant credentials from public ledger visibility while maintaining non-repudiable state enforcement.
+
+---
+
+## CI/CD Pipeline
+
+The project includes an automated **CI/CD Pipeline** powered by GitHub Actions. The workflow file is located at [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+### Workflow Jobs:
+1. **Checkout Code**: Fetches latest commit on `main`/`master` branches or pull requests.
+2. **Node.js Environment**: Sets up Node.js v22 environment.
+3. **Dependency Installation**: Runs `npm ci` cleanly.
+4. **Unit Test Suite**: Executes unit tests via `npm test` (`test/escrow.test.ts`).
+5. **TypeScript Compilation**: Validates Node/backend TypeScript code (`npm run build`).
+6. **Frontend App Compilation**: Validates React Vite client build (`npm run build:client`).
 
 ---
 
@@ -43,6 +65,9 @@ Midnight Escrow is a privacy-preserving digital agreement framework designed to 
 
 ```text
 escrow/
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # GitHub Actions CI/CD pipeline workflow
 ├── client/                     # Vite + React Modern DApp Frontend
 │   ├── src/
 │   │   ├── components/        # React UI components (Hero, WalletCard, EscrowStatus, etc.)
@@ -61,7 +86,6 @@ escrow/
 │   └── config.ts              # Address & network configuration
 ├── test/
 │   └── escrow.test.ts         # Unit test suite verifying circuit hashing and privacy model
-├── .github/workflows/ci.yml   # GitHub Actions CI/CD workflow
 └── vercel.json                # Vercel deployment configuration
 ```
 

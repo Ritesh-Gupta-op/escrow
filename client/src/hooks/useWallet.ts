@@ -7,6 +7,7 @@ function getAvailableWalletProviders(): WalletProvider[] {
 
   const win = window as unknown as Record<string, unknown>;
 
+  // 1. Midnight dApp Connector Standard (window.midnight)
   if (win['midnight'] && typeof win['midnight'] === 'object') {
     const midnight = win['midnight'] as Record<string, unknown>;
     for (const key of Object.keys(midnight)) {
@@ -18,25 +19,19 @@ function getAvailableWalletProviders(): WalletProvider[] {
       ) {
         providers.push({
           rdns: (candidate['rdns'] as string) || key,
-          name: (candidate['name'] as string) || key,
+          name: (candidate['name'] as string) || (key === 'mnLace' ? 'Lace Wallet' : key),
           icon: (candidate['icon'] as string) || null,
-          apiVersion: (candidate['apiVersion'] as string) || 'unknown',
+          apiVersion: (candidate['apiVersion'] as string) || '1.0.0',
           initialApi: candidate,
         });
       }
     }
   }
 
-  if (
-    providers.length === 0 &&
-    win['lace'] &&
-    typeof win['lace'] === 'object'
-  ) {
+  // 2. Direct Lace injection (window.lace or window.cardano.lace)
+  if (providers.length === 0 && win['lace'] && typeof win['lace'] === 'object') {
     const lace = win['lace'] as Record<string, unknown>;
-    if (
-      typeof lace['connect'] === 'function' ||
-      typeof lace['enable'] === 'function'
-    ) {
+    if (typeof lace['connect'] === 'function' || typeof lace['enable'] === 'function') {
       providers.push({
         rdns: 'mnLace',
         name: 'Lace Wallet',

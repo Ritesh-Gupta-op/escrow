@@ -27,3 +27,6 @@ jobs:
 
       - name: Build TypeScript sources
         run: npm run build
+
+      - name: Build React frontend app
+        run: npm run build:client

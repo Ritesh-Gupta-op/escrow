@@ -8,19 +8,21 @@ Midnight Escrow is a privacy-preserving digital agreement DApp built natively on
 | --- | --- |
 | **Network** | Midnight Preprod Testnet |
 | **Contract Address** | `02003ccecf9e1d8ea83e60155b5507ffcc98ae7ee5f4c4a45a333190df0e56e927c9` |
-| **Live Web App** | [https://escrow-henna-seven.vercel.app/](https://escrow-henna-seven.vercel.app/) |
+| **Live Web App** | [https://escrow-henna-seven.vercel.app/](https://escrow-r198.vercel.app/) |
 | **Demo Video** | [Watch Demonstration](https://drive.google.com/file/d/1JKyK9ODofAk_H_-WWBU35iC4dmaD63x5/view?usp=sharing) |
 
 ---
 
 ## UI Screenshots
-
-<img width="1902" height="856" alt="Midnight Escrow Hero Landing" src="https://github.com/user-attachments/assets/7f8c3f80-16bd-46fd-860d-8f122bda071a" />
-
-<img width="1864" height="834" alt="Midnight Escrow Control Center" src="https://github.com/user-attachments/assets/94ab9aff-b35f-4b05-a0a8-c841b9b2a096" />
+<img width="1905" height="871" alt="{536914CB-0387-482B-9181-09FB7C2A4FD8}" src="https://github.com/user-attachments/assets/d37563a3-b9b3-4e6f-bfd5-09436ddca7f4" />
 
 ---
+<img width="1905" height="810" alt="{4888D359-3645-4201-8676-2F4FAC0A1BB3}" src="https://github.com/user-attachments/assets/19441c27-5737-4470-a277-f504a4ecc6d6" />
 
+---
+<img width="1897" height="834" alt="{0CDB969C-0D2C-4F05-8C49-FA1FC84D1DE9}" src="https://github.com/user-attachments/assets/222aaa41-3afa-4628-91cd-7b68d3d56a4c" />
+
+---
 ## Initial Product Idea
 
 Midnight Escrow is a privacy-preserving digital agreement framework designed to solve transaction counterparty risk without exposing high-stakes commercial terms or participant identities on-chain. Built natively on Midnight's zero-knowledge layer, the application locks obligations behind cryptographic commitment schemes (`buyerAuthority`, `sellerAuthority`, and `agreementCommitment`), allowing escrow release or refund actions to execute only when secret preimages are proven via Compact ZK circuits. This model protects sensitive deal amounts, agreement terms, and participant credentials from public ledger visibility while maintaining non-repudiable state enforcement.

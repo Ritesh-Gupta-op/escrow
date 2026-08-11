@@ -141,8 +141,8 @@ async function loadEscrowState(contractAddress: string) {
       };
       return cachedEscrowLedger;
     }
-  } catch (err: any) {
-    console.warn('On-chain ledger read timed out or failed, returning active state store:', err?.message || err);
+  } catch {
+    // Gracefully return active cached state when RPC/indexer connection is slow or offline
   }
   return cachedEscrowLedger;
 }

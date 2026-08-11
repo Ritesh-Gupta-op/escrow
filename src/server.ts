@@ -69,6 +69,15 @@ function secretBytes(value: unknown): Buffer {
   return Buffer.from(createHash('sha256').update(value, 'utf8').digest());
 }
 
+/**
+ * Midnight contract addresses carry a 2-byte (4 hex char) network-type prefix, e.g. "0200…".
+ * SDK functions that operate on contract address keys (private state provider, findDeployedContract)
+ * expect the raw 32-byte (64 hex char) address without that prefix.
+ */
+function normalizeContractAddress(addr: string): string {
+  return addr.length === 68 ? addr.slice(4) : addr;
+}
+
 function privateTermsCommitment(amount: number, terms: string): Buffer {
   const seed = `${amount}:${terms ?? ''}:${randomBytes(32).toString('hex')}`;
   return Buffer.from(createHash('sha256').update(seed, 'utf8').digest());
@@ -109,6 +118,7 @@ async function loadEscrowState(contractAddress: string) {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Context timeout')), 3000))
     ]);
     const state = await Promise.race([
+      // queryContractState uses the full address (with prefix) — that is correct for the Midnight indexer
       ctx.providers.publicDataProvider.queryContractState(contractAddress),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Indexer query timeout')), 3000))
     ]);
@@ -134,14 +144,23 @@ async function setEscrowPrivateState(
   nextState: Partial<EscrowPrivateState>,
 ): Promise<void> {
   try {
-    const ctx = await getAppContext();
+    const ctx = await Promise.race([
+      getAppContext(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Private state timeout')), 3000))
+    ]);
     const provider = ctx.providers.privateStateProvider;
-    provider.setContractAddress(contractAddress as any);
+    // Midnight contract addresses have a 2-byte (4 hex char) network prefix (e.g. "0200").
+    // The LevelDB private state provider expects exactly 32 bytes (64 hex chars).
+    // Strip the prefix if the address is 34 bytes (68 hex chars).
+    const normalizedAddress = contractAddress.length === 68
+      ? contractAddress.slice(4)
+      : contractAddress;
+    provider.setContractAddress(normalizedAddress as any);
     const current = (await provider.get(PRIVATE_STATE_ID)) as Partial<EscrowPrivateState> | null;
     const updated = { ...current, ...nextState } as EscrowPrivateState;
     await provider.set(PRIVATE_STATE_ID, updated);
   } catch (err: any) {
-    console.warn('Private state storage write skipped:', err?.message || err);
+    console.warn('Private state storage write skipped (non-critical):', err?.message || err);
   }
 }
 
@@ -283,7 +302,7 @@ const server = createServer(async (req, res) => {
         const providers = ctx.providers;
         const deployed: any = await findDeployedContract(providers as any, {
           compiledContract: ctx.compiledContract as any,
-          contractAddress,
+          contractAddress: normalizeContractAddress(contractAddress),
           privateStateId: PRIVATE_STATE_ID,
           initialPrivateState: {},
         });
@@ -364,7 +383,7 @@ const server = createServer(async (req, res) => {
         ]);
         const deployed: any = await findDeployedContract(ctx.providers as any, {
           compiledContract: ctx.compiledContract as any,
-          contractAddress,
+          contractAddress: normalizeContractAddress(contractAddress),
           privateStateId: PRIVATE_STATE_ID,
           initialPrivateState: {},
         });
@@ -428,7 +447,7 @@ const server = createServer(async (req, res) => {
         ]);
         const deployed: any = await findDeployedContract(ctx.providers as any, {
           compiledContract: ctx.compiledContract as any,
-          contractAddress,
+          contractAddress: normalizeContractAddress(contractAddress),
           privateStateId: PRIVATE_STATE_ID,
           initialPrivateState: {},
         });

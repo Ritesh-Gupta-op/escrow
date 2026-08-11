@@ -16,9 +16,12 @@ import { createWallet, persistWalletState, type WalletContext } from './wallet';
 globalThis.WebSocket = WebSocket;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const indexHtmlPath = resolve(__dirname, '..', 'public', 'index.html');
-const html = existsSync(indexHtmlPath)
-  ? readFileSync(indexHtmlPath, 'utf8')
+const clientDistDir = resolve(__dirname, '..', 'client', 'dist');
+const indexHtmlPath = resolve(clientDistDir, 'index.html');
+const fallbackHtmlPath = resolve(__dirname, '..', 'public', 'index.html');
+const targetHtmlPath = existsSync(indexHtmlPath) ? indexHtmlPath : fallbackHtmlPath;
+const html = existsSync(targetHtmlPath)
+  ? readFileSync(targetHtmlPath, 'utf8')
   : '<!doctype html><html><body><h1>Escrow UI not found</h1></body></html>';
 
 const STATUS_NAMES = ['UNFUNDED', 'FUNDED', 'RELEASED', 'REFUNDED'] as const;
@@ -118,7 +121,22 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url, 'http://localhost');
 
-  if (req.method === 'GET' && url.pathname === '/') {
+  if (req.method === 'GET' && (url.pathname === '/' || !url.pathname.startsWith('/api'))) {
+    const staticFilePath = resolve(clientDistDir, url.pathname.slice(1));
+    if (url.pathname !== '/' && existsSync(staticFilePath)) {
+      const ext = staticFilePath.split('.').pop() || '';
+      const contentTypes: Record<string, string> = {
+        js: 'application/javascript',
+        css: 'text/css',
+        svg: 'image/svg+xml',
+        png: 'image/png',
+        html: 'text/html',
+      };
+      res.writeHead(200, { 'Content-Type': contentTypes[ext] || 'application/octet-stream' });
+      res.end(readFileSync(staticFilePath));
+      return;
+    }
+
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
     return;

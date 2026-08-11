@@ -1,12 +1,13 @@
-interface ResponsePanelProps {
-  response: string;
-}
-
-export default function ResponsePanel({ response }: ResponsePanelProps) {
+export default function ResponsePanel({ response }: { response: string }) {
   return (
-    <section className="card">
-      <h2 className="card-title">Circuit Response</h2>
-      <pre className="response-panel">{response || 'Ready.'}</pre>
-    </section>
+    <div className="terminal">
+      <div className="terminal-bar">
+        <span className="terminal-dot td-red" />
+        <span className="terminal-dot td-amber" />
+        <span className="terminal-dot td-green" />
+        <span className="terminal-title">circuit output</span>
+      </div>
+      <pre className="terminal-body">{response || '> Ready for instructions…'}</pre>
+    </div>
   );
 }

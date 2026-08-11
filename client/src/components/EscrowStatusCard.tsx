@@ -2,58 +2,70 @@ import type { EscrowState } from '../types';
 
 interface EscrowStatusCardProps {
   state: EscrowState;
+  onRefresh: () => void;
 }
 
-function formatBytes(value: string | null): string {
-  if (!value) return '—';
-  return value.slice(0, 8) + '…' + value.slice(-8);
+function fmt(v: string | null): string {
+  if (!v || v === '—') return '—';
+  if (v.length > 20) return v.slice(0, 10) + '…' + v.slice(-8);
+  return v;
 }
 
-export default function EscrowStatusCard({ state }: EscrowStatusCardProps) {
+function statusBadge(s: string | null) {
+  const map: Record<string, string> = {
+    UNFUNDED: 'badge--gray',
+    FUNDED:   'badge--gold',
+    RELEASED: 'badge--green',
+    REFUNDED: 'badge--violet',
+    UNDEPLOYED: 'badge--gray',
+    UNKNOWN:    'badge--gray',
+  };
+  const cls = map[s ?? ''] ?? 'badge--gray';
   return (
-    <section className="card" id="escrow-status">
-      <h2 className="card-title">Escrow Ledger Status</h2>
-      <div className="status-grid">
-        <div className="status-row">
-          <span className="status-label">Contract Address</span>
-          <strong className="status-value mono">
-            {state.contractAddress ? formatBytes(state.contractAddress) : 'Loading…'}
-          </strong>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Status</span>
-          <strong className="status-value">
-            {state.statusName || state.status || 'Loading…'}
-          </strong>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Agreement Commitment</span>
-          <strong className="status-value mono">
-            {formatBytes(state.agreementCommitment)}
-          </strong>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Buyer Authority</span>
-          <strong className="status-value mono">
-            {formatBytes(state.buyerAuthority)}
-          </strong>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Seller Authority</span>
-          <strong className="status-value mono">
-            {formatBytes(state.sellerAuthority)}
-          </strong>
-        </div>
-        {state.network && (
-          <div className="status-row">
-            <span className="status-label">Network</span>
-            <span className="badge badge-blue">{state.network}</span>
-          </div>
-        )}
+    <span className={`badge ${cls}`}>
+      <span className="badge-dot" />
+      {s ?? '—'}
+    </span>
+  );
+}
+
+export default function EscrowStatusCard({ state, onRefresh }: EscrowStatusCardProps) {
+  const rows = [
+    { k: 'Contract Address', v: fmt(state.contractAddress), mono: true },
+    { k: 'Network',          v: state.network ?? '—' },
+    { k: 'Agreement Hash',   v: fmt(state.agreementCommitment), mono: true },
+    { k: 'Buyer Authority',  v: fmt(state.buyerAuthority), mono: true },
+    { k: 'Seller Authority', v: fmt(state.sellerAuthority), mono: true },
+  ];
+
+  return (
+    <div className="card card-accent">
+      <div className="flex items-center justify-between mb-20">
+        <div className="card-label">Live Contract State</div>
+        <button className="icon-btn" onClick={onRefresh} title="Refresh">↻</button>
       </div>
+
+      <div className="flex items-center gap-12 mb-20" style={{ paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Status</div>
+          {statusBadge(state.statusName || state.status)}
+        </div>
+      </div>
+
+      <div className="kv-list">
+        {rows.map(({ k, v, mono }) => (
+          <div className="kv-row" key={k}>
+            <span className="kv-key">{k}</span>
+            <span className={`kv-val ${mono ? 'kv-mono' : ''}`}>{v}</span>
+          </div>
+        ))}
+      </div>
+
       {state.message && (
-        <div className="notice">{state.message}</div>
+        <div className="notice notice--info mt-12" style={{ marginTop: 16 }}>
+          {state.message}
+        </div>
       )}
-    </section>
+    </div>
   );
 }

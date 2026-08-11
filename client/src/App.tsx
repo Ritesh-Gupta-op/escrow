@@ -14,54 +14,39 @@ import './index.css';
 
 export default function App() {
   const [network, setNetwork] = useState<NetworkId>('preprod');
-  const workspaceRef = useRef<HTMLElement>(null);
+  const [activeTab, setActiveTab] = useState<'create' | 'release' | 'refund'>('create');
+  const appRef = useRef<HTMLDivElement>(null);
 
   const {
-    walletDetails,
-    hasExtension,
-    primaryProvider,
-    loading: walletLoading,
-    error: walletError,
-    setError: setWalletError,
-    connect,
-    disconnect,
+    walletDetails, hasExtension, primaryProvider,
+    loading: walletLoading, error: walletError,
+    setError: setWalletError, connect, disconnect,
   } = useWallet();
 
   const {
-    escrowState,
-    response,
-    loading: escrowLoading,
-    createEscrow,
-    releaseEscrow,
-    refundEscrow,
+    escrowState, response, loading: escrowLoading,
+    refresh, createEscrow, releaseEscrow, refundEscrow,
   } = useEscrow();
 
   const handleWalletAction = useCallback(async () => {
     setWalletError(null);
     try {
-      if (walletDetails) {
-        await disconnect();
-      } else {
-        await connect(network);
-      }
-    } catch { /* errors surfaced via hook */ }
+      if (walletDetails) await disconnect();
+      else await connect(network);
+    } catch { /* surfaced via hook */ }
   }, [walletDetails, connect, disconnect, network, setWalletError]);
 
-  const scrollToWorkspace = () => {
-    workspaceRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToApp = () => appRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-  const isLoading = walletLoading || escrowLoading;
+  const busy = walletLoading || escrowLoading;
+  const isConnected = Boolean(walletDetails);
 
   return (
     <>
-      {/* ── Hero Viewport ─────────────────────── */}
+      {/* ── CINEMATIC HERO ── */}
       <div className="hero-viewport">
         <video autoPlay loop muted playsInline className="video-bg">
-          <source
-            src="https://designerstephen.github.io/public-assets/videos/serene-art-hero.mp4"
-            type="video/mp4"
-          />
+          <source src="https://designerstephen.github.io/public-assets/videos/serene-art-hero.mp4" type="video/mp4" />
         </video>
         <div className="video-overlay" />
 
@@ -70,71 +55,117 @@ export default function App() {
           walletLoading={walletLoading}
           hasExtension={hasExtension}
           network={network}
-          onNetworkChange={setNetwork}
           onWalletAction={handleWalletAction}
         />
 
-        <HeroSection onCTAClick={scrollToWorkspace} />
+        <HeroSection onCTAClick={scrollToApp} />
+
+        <div className="scroll-hint" onClick={scrollToApp}>
+          <span>Scroll</span>
+          <div className="scroll-hint-line" />
+        </div>
       </div>
 
-      {/* ── Escrow DApp Workspace ─────────────── */}
-      <section className="dapp-workspace" id="workspace" ref={workspaceRef}>
-        <div className="workspace-inner">
-          <h2 className="section-heading">Escrow Control Center</h2>
-          <p className="section-subhead">
-            Connect your browser wallet via{' '}
-            <code style={{ fontFamily: 'monospace', color: '#a78bfa' }}>
-              @midnight-ntwrk/dapp-connector-api
-            </code>{' '}
-            to execute zero-knowledge circuit transactions.
-          </p>
+      {/* ── APP SHELL ── */}
+      <div className="app-shell" id="app" ref={appRef}>
+        <div className="app-inner">
 
-          {/* Row 1: Status + Response */}
-          <div className="grid grid-2" style={{ marginBottom: '1.5rem' }}>
-            <EscrowStatusCard state={escrowState} />
-            <ResponsePanel response={response} />
+          {/* Section Header */}
+          <div className="mb-32" style={{ marginBottom: 40 }}>
+            <div className="section-eyebrow">Escrow Protocol</div>
+            <h2 className="section-title">Control Center</h2>
+            <p className="section-desc">
+              Execute zero-knowledge circuit transactions. Your secrets are hashed locally and never transmitted in plaintext.
+            </p>
           </div>
 
-          {/* Row 2: Wallet Connection (full width) */}
-          <WalletCard
-            walletDetails={walletDetails}
-            hasExtension={hasExtension}
-            providerName={primaryProvider?.name ?? 'Detecting…'}
-            loading={walletLoading}
-            error={walletError}
-            network={network}
-            onNetworkChange={setNetwork}
-            onConnect={() => connect(network)}
-            onDisconnect={disconnect}
-          />
-
-          {/* Row 3: Create Form + Release & Refund */}
-          <div
-            className="grid grid-2"
-            style={{ marginTop: '1.5rem' }}
-          >
-            <CreateEscrowForm
+          {/* Row 1: Wallet + Status */}
+          <div className="grid grid-2" style={{ marginBottom: 20 }}>
+            <WalletCard
               walletDetails={walletDetails}
-              loading={isLoading}
-              onSubmit={createEscrow}
+              hasExtension={hasExtension}
+              providerName={primaryProvider?.name ?? 'Detecting…'}
+              loading={walletLoading}
+              error={walletError}
+              network={network}
+              onNetworkChange={setNetwork}
+              onConnect={() => connect(network)}
+              onDisconnect={disconnect}
             />
+            <EscrowStatusCard state={escrowState} onRefresh={refresh} />
+          </div>
 
-            <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-              <ReleaseEscrowForm
-                walletDetails={walletDetails}
-                loading={isLoading}
-                onSubmit={releaseEscrow}
-              />
-              <hr style={{ borderColor: 'rgba(255,255,255,0.07)', borderTop: 'none' }} />
-              <RefundEscrowForm
-                walletDetails={walletDetails}
-                loading={isLoading}
-                onSubmit={refundEscrow}
-              />
-            </section>
+          {/* Row 2: Action Panel + Terminal */}
+          <div className="grid grid-2">
+            {/* Left: Tab-switched Action Panel */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-20" style={{ marginBottom: 24 }}>
+                <div className="card-label">Actions</div>
+                {!isConnected && (
+                  <span className="badge badge--gray">Wallet required</span>
+                )}
+              </div>
+
+              {/* Tab switcher */}
+              <div className="tabs" style={{ marginBottom: 28 }}>
+                {(['create', 'release', 'refund'] as const).map((t) => (
+                  <button
+                    key={t}
+                    className={`tab-btn ${activeTab === t ? 'active' : ''}`}
+                    onClick={() => setActiveTab(t)}
+                  >
+                    {t === 'create' ? '＋ Create' : t === 'release' ? '↑ Release' : '↩ Refund'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab content */}
+              {activeTab === 'create' && (
+                <CreateEscrowForm walletDetails={walletDetails} loading={busy} onSubmit={createEscrow} />
+              )}
+              {activeTab === 'release' && (
+                <ReleaseEscrowForm walletDetails={walletDetails} loading={busy} onSubmit={releaseEscrow} />
+              )}
+              {activeTab === 'refund' && (
+                <RefundEscrowForm walletDetails={walletDetails} loading={busy} onSubmit={refundEscrow} />
+              )}
+            </div>
+
+            {/* Right: Terminal + How-it-works */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <ResponsePanel response={response} />
+
+              {/* Feature list */}
+              <div className="card">
+                <div className="card-label">Protocol Properties</div>
+                <div className="kv-list" style={{ marginTop: 12 }}>
+                  {[
+                    { icon: '🔒', t: 'Zero-Knowledge Proofs', d: 'Secrets verified without disclosure' },
+                    { icon: '⬡', t: 'Midnight Network', d: 'Privacy-native L1 blockchain' },
+                    { icon: '📄', t: 'Compact Circuit', d: 'Formally verified ZK escrow logic' },
+                    { icon: '🔑', t: 'Local Key Hashing', d: 'SHA-256 before any network call' },
+                  ].map(({ icon, t, d }) => (
+                    <div key={t} className="kv-row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                      <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{t}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{d}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="footer" style={{ marginTop: 64, padding: '24px 0' }}>
+            <span className="footer-brand">Escrow®</span>
+            <span>Powered by Midnight Network · Zero-Knowledge Privacy Protocol</span>
+            <span>{new Date().getFullYear()}</span>
           </div>
         </div>
-      </section>
+      </div>
     </>
   );
 }

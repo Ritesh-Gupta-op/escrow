@@ -4,22 +4,42 @@ interface HeroSectionProps {
 
 export default function HeroSection({ onCTAClick }: HeroSectionProps) {
   return (
-    <main className="hero-content">
-      <h1 className="hero-title animate-fade-rise delay-0">
-        Private <em>Escrow</em> Architecture
+    <div className="hero-body">
+      {/* Tag */}
+      <div className="hero-tag anim-rise d0">
+        Zero-Knowledge Escrow Protocol
+      </div>
+
+      {/* Headline */}
+      <h1 className="hero-h1 anim-rise d1">
+        Private <em>agreements</em>,<br />
+        on-chain trust.
       </h1>
-      <p className="hero-paragraph animate-fade-rise delay-200">
-        A minimalist, high-end cryptographic escrow protocol powered by Midnight
-        zero-knowledge circuits. Create confidential agreements and authorize
-        releases without revealing private preimages on-chain.
+
+      {/* Sub */}
+      <p className="hero-sub anim-rise d2">
+        Create, fund, and settle escrow agreements using Midnight's
+        zero-knowledge circuits — secrets never touch the chain.
       </p>
-      <button
-        className="pill-btn pill-btn-hero animate-fade-rise delay-400"
-        onClick={onCTAClick}
-        id="hero-cta-btn"
-      >
-        Explore Escrow DApp
+
+      {/* CTA */}
+      <button className="btn btn-hero anim-rise d3" onClick={onCTAClick} id="hero-cta">
+        Enter Application ↓
       </button>
-    </main>
+
+      {/* Stats Row */}
+      <div className="hero-stats anim-fade d4">
+        {[
+          { v: '100%', l: 'Privacy Preserved' },
+          { v: 'ZK', l: 'Proof Generation' },
+          { v: '0', l: 'Secrets On-Chain' },
+        ].map(({ v, l }) => (
+          <div className="stat-item" key={l}>
+            <div className="stat-value">{v}</div>
+            <div className="stat-label">{l}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

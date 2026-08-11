@@ -23,86 +23,84 @@ export default function WalletCard({
   onConnect,
   onDisconnect,
 }: WalletCardProps) {
-  const isConnected = Boolean(walletDetails);
+  const connected = Boolean(walletDetails);
 
   return (
-    <section className="card" id="wallet-section">
-      <h2 className="card-title">Frontend Wallet Connection</h2>
-      <p className="card-subtitle">@midnight-ntwrk/dapp-connector-api</p>
+    <div className="card card-gold" id="wallet-section">
+      <div className="card-label">Wallet Connection</div>
 
-      <div className="status-grid">
-        <div className="status-row">
-          <span className="status-label">Target Network</span>
-          <select
-            className="inline-select"
-            value={network}
-            onChange={(e) => onNetworkChange(e.target.value as NetworkId)}
-            id="network-select"
+      <div className="wallet-panel">
+        {/* Left: indicator */}
+        <div className="wallet-indicator">
+          <div className="wallet-orb">
+            {connected ? '⬡' : '○'}
+            {connected && <div className="wallet-orb-ring" />}
+          </div>
+          <div>
+            <div className="wallet-name">
+              {connected ? walletDetails!.name : hasExtension ? providerName : 'No Extension Found'}
+            </div>
+            <div className="wallet-addr">
+              {connected
+                ? (walletDetails!.shieldedAddress || walletDetails!.address).slice(0, 24) + '…'
+                : 'Install Lace or Midnight Wallet to continue'}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
+          <div className="flex items-center gap-8">
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Network</span>
+            <select
+              className="inline-select"
+              value={network}
+              onChange={(e) => onNetworkChange(e.target.value as NetworkId)}
+              id="network-select"
+            >
+              <option value="preprod">Preprod</option>
+              <option value="preview">Preview</option>
+              <option value="undeployed">Local Devnet</option>
+            </select>
+          </div>
+
+          <button
+            className={`btn ${connected ? 'btn-ghost' : 'btn-violet'}`}
+            style={{ minWidth: 160 }}
+            onClick={connected ? onDisconnect : onConnect}
+            disabled={loading}
+            id="wallet-action-btn"
           >
-            <option value="preprod">Preprod</option>
-            <option value="preview">Preview</option>
-            <option value="undeployed">Devnet (Local)</option>
-          </select>
+            {loading ? 'Connecting…' : connected ? 'Disconnect' : hasExtension ? 'Connect Wallet' : 'Install Extension'}
+          </button>
         </div>
-        <div className="status-row">
-          <span className="status-label">Wallet Provider</span>
-          <strong className="status-value">
-            {hasExtension ? providerName : 'No DApp Connector Found'}
-          </strong>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Connection Status</span>
-          <span className={`badge ${isConnected ? 'badge-green' : 'badge-gray'}`}>
-            {isConnected ? 'Connected' : 'Not Connected'}
-          </span>
-        </div>
-        {walletDetails && (
-          <>
-            <div className="status-row">
-              <span className="status-label">Connected Address</span>
-              <strong className="status-value mono">{walletDetails.address}</strong>
-            </div>
-            <div className="status-row">
-              <span className="status-label">Shielded Address</span>
-              <strong className="status-value mono">
-                {walletDetails.shieldedAddress || 'N/A'}
-              </strong>
-            </div>
-            <div className="status-row">
-              <span className="status-label">Unshielded Address</span>
-              <strong className="status-value mono">
-                {walletDetails.unshieldedAddress || 'N/A'}
-              </strong>
-            </div>
-          </>
-        )}
       </div>
 
-      {error && (
-        <div className="notice notice-error">{error}</div>
+      {/* Detail rows when connected */}
+      {connected && (
+        <div className="kv-list mt-20" style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+          <div className="kv-row">
+            <span className="kv-key">Network</span>
+            <span className="badge badge--violet">{walletDetails!.network}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key">Shielded Address</span>
+            <span className="kv-val kv-mono">{walletDetails!.shieldedAddress || 'N/A'}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key">Unshielded Address</span>
+            <span className="kv-val kv-mono">{walletDetails!.unshieldedAddress || 'N/A'}</span>
+          </div>
+        </div>
       )}
 
-      <button
-        className="form-btn"
-        style={{ marginTop: '1.5rem' }}
-        onClick={isConnected ? onDisconnect : onConnect}
-        disabled={loading}
-        id="wallet-action-btn"
-      >
-        {loading
-          ? 'Connecting…'
-          : isConnected
-          ? 'Disconnect Wallet'
-          : hasExtension
-          ? 'Connect Wallet'
-          : 'Install Lace / Midnight Wallet'}
-      </button>
+      {error && <div className="notice notice--error" style={{ marginTop: 16 }}>{error}</div>}
 
-      <p className="notice">
-        Connect your browser wallet extension (Lace or Midnight Wallet implementing{' '}
-        <code>@midnight-ntwrk/dapp-connector-api</code>) to sign and execute
-        escrow transactions.
-      </p>
-    </section>
+      {!connected && (
+        <div className="notice notice--info" style={{ marginTop: 16 }}>
+          Connect using <code>@midnight-ntwrk/dapp-connector-api</code> (Lace or Midnight Wallet extension).
+        </div>
+      )}
+    </div>
   );
 }

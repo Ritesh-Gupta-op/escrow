@@ -146,9 +146,9 @@ No additional coding should be required.
 - Placeholder — add a dashboard screenshot after deployment.
 - Placeholder — add a successful escrow lifecycle screenshot after deployment.
 
-## Initial Idea
+## Initial Product Idea
 
-- Placeholder — add the original project idea and product rationale here.
+Midnight Escrow is a privacy-preserving digital agreement framework designed to solve transaction counterparty risk without exposing high-stakes commercial terms or participant identities on-chain. Built natively on Midnight's zero-knowledge layer, the application locks obligations behind cryptographic commitment schemes (`buyerAuthority`, `sellerAuthority`, and `agreementCommitment`), allowing escrow release or refund actions to execute only when secret preimages are proven via Compact ZK circuits. This model protects sensitive deal amounts, agreement terms, and participant credentials from public ledger visibility while maintaining non-repudiable state enforcement.
 
 ## Troubleshooting
 

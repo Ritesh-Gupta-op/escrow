@@ -5,41 +5,40 @@ interface NavBarProps {
   walletLoading: boolean;
   hasExtension: boolean;
   network: NetworkId;
-  onNetworkChange: (n: NetworkId) => void;
   onWalletAction: () => void;
 }
 
-export default function NavBar({
-  walletDetails,
-  walletLoading,
-  onWalletAction,
-}: NavBarProps) {
+export default function NavBar({ walletDetails, walletLoading, network, onWalletAction }: NavBarProps) {
   const isConnected = Boolean(walletDetails);
 
   return (
-    <header className="navbar-container">
-      {/* Left: Brand Logo */}
+    <nav className="navbar anim-fade d0">
+      {/* Left — Logo */}
       <a href="#" className="nav-logo">
         Escrow<sup>®</sup>
       </a>
 
-      {/* Center: Nav Links */}
+      {/* Center — Links */}
       <ul className="nav-links">
-        <li><a href="#workspace" className="nav-link">Protocol</a></li>
-        <li><a href="#workspace" className="nav-link">Collections</a></li>
-        <li><a href="#escrow-status" className="nav-link">Escrow Status</a></li>
-        <li><a href="#wallet-section" className="nav-link">Wallet</a></li>
+        {['Protocol', 'Create', 'Release', 'Status'].map((l) => (
+          <li key={l}>
+            <a href="#app" className="nav-link">{l}</a>
+          </li>
+        ))}
       </ul>
 
-      {/* Right: Pill CTA */}
-      <button
-        className="pill-btn pill-btn-sm"
-        onClick={onWalletAction}
-        disabled={walletLoading}
-        id="nav-connect-btn"
-      >
-        {walletLoading ? 'Connecting…' : isConnected ? 'Disconnect' : 'Find my dream'}
-      </button>
-    </header>
+      {/* Right — Network + Wallet */}
+      <div className="nav-right">
+        <span className="nav-net-badge">{network}</span>
+        <button
+          className={`btn ${isConnected ? 'btn-ghost' : 'btn-primary'}`}
+          onClick={onWalletAction}
+          disabled={walletLoading}
+          id="nav-wallet-btn"
+        >
+          {walletLoading ? '…' : isConnected ? '⬡ Connected' : 'Connect Wallet'}
+        </button>
+      </div>
+    </nav>
   );
 }

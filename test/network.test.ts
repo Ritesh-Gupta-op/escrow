@@ -1,7 +1,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { NETWORK_IDS, isNetworkId, parseNetworkFlag, resolveNetwork } from '../src/network';
+import {
+  NETWORK_IDS,
+  isNetworkId,
+  parseNetworkFlag,
+  recordDeployment,
+  resolveNetwork,
+  setActiveNetwork,
+  loadState,
+} from '../src/network';
 
 describe('Network identifiers', () => {
   it('exposes every configured network as a valid identifier', () => {
@@ -57,5 +68,24 @@ describe('Network identifiers', () => {
     assert.equal(result.config.indexer, 'https://example.test/graphql');
     assert.equal(result.config.node, 'https://example.test/rpc');
     assert.equal(result.config.indexerWS, 'wss://indexer.preview.midnight.network/api/v4/graphql/ws');
+  });
+
+  it('persists active network and deployment records together', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'escrow-network-'));
+    try {
+      setActiveNetwork('preprod', { cwd });
+      recordDeployment('preprod', '0xcontract', '0xdeployer', { cwd });
+
+      const state = loadState({ cwd });
+      assert.equal(state?.activeNetwork, 'preprod');
+      assert.deepEqual(state?.deployments?.preprod, {
+        address: '0xcontract',
+        deployer: '0xdeployer',
+        deployedAt: state?.deployments?.preprod?.deployedAt,
+      });
+      assert.match(state?.deployments?.preprod?.deployedAt ?? '', /^\d{4}-\d{2}-\d{2}T/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

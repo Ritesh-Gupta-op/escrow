@@ -30,3 +30,6 @@ jobs:
 
       - name: Build React frontend app
         run: npm run build:client
+
+      - name: Lint React frontend app
+        run: npm --prefix client run lint

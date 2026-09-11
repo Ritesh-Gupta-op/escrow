@@ -41,4 +41,21 @@ describe('Network identifiers', () => {
     assert.equal(result.source, 'default');
     assert.equal(result.config.node, 'ws://127.0.0.1:9944');
   });
+
+  it('applies endpoint environment overrides to the selected network', () => {
+    const result = resolveNetwork({
+      argv: ['node', 'script', '--network=preview'],
+      env: {
+        MIDNIGHT_INDEXER_URL: 'https://example.test/graphql',
+        MIDNIGHT_NODE_URL: 'https://example.test/rpc',
+      },
+      cwd: 'C:\\path\\without\\state',
+    });
+
+    assert.equal(result.network, 'preview');
+    assert.equal(result.source, 'flag');
+    assert.equal(result.config.indexer, 'https://example.test/graphql');
+    assert.equal(result.config.node, 'https://example.test/rpc');
+    assert.equal(result.config.indexerWS, 'wss://indexer.preview.midnight.network/api/v4/graphql/ws');
+  });
 });

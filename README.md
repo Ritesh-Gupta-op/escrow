@@ -8,7 +8,7 @@ Midnight Escrow is a privacy-preserving digital agreement DApp built natively on
 | --- | --- |
 | **Network** | Midnight Preprod Testnet |
 | **Contract Address** | `02003ccecf9e1d8ea83e60155b5507ffcc98ae7ee5f4c4a45a333190df0e56e927c9` |
-| **Live Web App** | [https://escrow-henna-seven.vercel.app/](https://escrow-r198.vercel.app/) |
+| **Live Web App** | [https://escrow-r198.vercel.app/](https://escrow-r198.vercel.app/) |
 | **Demo Video** | [Watch Demonstration](https://drive.google.com/file/d/1JKyK9ODofAk_H_-WWBU35iC4dmaD63x5/view?usp=sharing) |
 
 ---

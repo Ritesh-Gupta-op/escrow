@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NETWORK_IDS, isNetworkId, parseNetworkFlag } from '../src/network';
+import { NETWORK_IDS, isNetworkId, parseNetworkFlag, resolveNetwork } from '../src/network';
 
 describe('Network identifiers', () => {
   it('exposes every configured network as a valid identifier', () => {
@@ -28,5 +28,17 @@ describe('Network identifiers', () => {
       () => parseNetworkFlag(['node', 'script', '--network', 'mainnet']),
       /Unknown network: mainnet/,
     );
+  });
+
+  it('defaults to the undeployed network without state or flags', () => {
+    const result = resolveNetwork({
+      argv: ['node', 'script'],
+      env: {},
+      cwd: 'C:\\path\\without\\state',
+    });
+
+    assert.equal(result.network, 'undeployed');
+    assert.equal(result.source, 'default');
+    assert.equal(result.config.node, 'ws://127.0.0.1:9944');
   });
 });

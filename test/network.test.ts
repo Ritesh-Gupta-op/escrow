@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   NETWORK_IDS,
   isNetworkId,
+  getOrCreateSeed,
   parseNetworkFlag,
   recordDeployment,
   resolveNetwork,
@@ -87,5 +88,23 @@ describe('Network identifiers', () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it('uses the genesis seed for local development', () => {
+    const seed = getOrCreateSeed('undeployed', {
+      env: {},
+      cwd: 'C:\\path\\without\\state',
+    });
+
+    assert.equal(seed, '0000000000000000000000000000000000000000000000000000000000000001');
+  });
+
+  it('honors an explicitly supplied wallet seed', () => {
+    const seed = getOrCreateSeed('preprod', {
+      env: { MIDNIGHT_WALLET_SEED: 'test-seed' },
+      cwd: 'C:\\path\\without\\state',
+    });
+
+    assert.equal(seed, 'test-seed');
   });
 });

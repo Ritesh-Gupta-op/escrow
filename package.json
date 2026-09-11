@@ -21,7 +21,7 @@
     "proof-server:start": "docker compose up -d",
     "proof-server:stop": "docker compose down",
     "clean": "rm -rf contracts/managed .midnight-state.json .midnight-wallet-state",
-    "test": "node --test --import tsx test/escrow.test.ts",
+    "test": "node --test --import tsx \"test/**/*.test.ts\"",
     "test:e2e": "tsx scripts/e2e-check.ts"
   },
   "dependencies": {
